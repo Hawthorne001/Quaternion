@@ -16,15 +16,9 @@
 
 using namespace Quotient;
 
-QuaternionRoom::QuaternionRoom(Connection* connection, QString roomId,
-                               JoinState joinState)
+QuaternionRoom::QuaternionRoom(Connection* connection, QString roomId, JoinState joinState)
     : Room(connection, std::move(roomId), joinState)
-{
-    connect(this, &Room::namesChanged,
-            this, &QuaternionRoom::htmlSafeDisplayNameChanged);
-    connect(this, &Room::eventsHistoryJobChanged,
-            this, &QuaternionRoom::requestedEventsCountChanged);
-}
+{}
 
 const QString& QuaternionRoom::cachedUserFilter() const
 {
@@ -77,20 +71,19 @@ void QuaternionRoom::saveViewport(int topIndex, int bottomIndex, bool force)
     setLastDisplayedEvent(maxTimelineIndex() - bottomIndex);
 }
 
-QString QuaternionRoom::htmlSafeDisplayName() const
+bool QuaternionRoom::canRedact(const Quotient::EventId& eventId) const
 {
-    return displayName().toHtmlEscaped();
-}
+    if (const auto it = findInTimeline(eventId); it != historyEdge()) {
+        const auto localMemberId = localMember().id();
+        const auto memberId = it->event()->senderId();
+        if (localMemberId == memberId)
+            return true;
 
-int QuaternionRoom::requestedEventsCount() const
-{
-    return eventsHistoryJob() != nullptr ? m_requestedEventsCount : 0;
-}
-
-void QuaternionRoom::getHistory(int limit)
-{
-    m_requestedEventsCount = limit;
-    getPreviousContent(m_requestedEventsCount);
+        const auto& ple = currentState().get<RoomPowerLevelsEvent>();
+        const auto currentUserPl = ple->powerLevelForUser(localMemberId);
+        return currentUserPl >= ple->redact() && currentUserPl >= ple->powerLevelForUser(memberId);
+    }
+    return false;
 }
 
 void QuaternionRoom::onAddNewTimelineEvents(timeline_iter_t from)
@@ -107,7 +100,7 @@ void QuaternionRoom::onAddHistoricalTimelineEvents(rev_iter_t from)
 
 void QuaternionRoom::checkForHighlights(const Quotient::TimelineItem& ti)
 {
-    const auto localUserId = localUser()->id();
+    const auto localUserId = localMember().id();
     if (ti->senderId() == localUserId)
         return;
     if (auto* e = ti.viewAs<RoomMessageEvent>()) {
@@ -124,7 +117,7 @@ void QuaternionRoom::checkForHighlights(const Quotient::TimelineItem& ti)
             localUserExpressions[localUserId] = QRegularExpression("(\\W|^)" + localUserId + "(\\W|$)", ReOpt);
         }
 
-        const auto memberName = disambiguatedMemberName(localUserId);
+        const auto memberName = member(localUserId).disambiguatedName();
         if (!roomMemberExpressions.contains(memberName)) {
             // FIXME: unravels if the room member name contains characters special
             //        to regexp($, e.g.)

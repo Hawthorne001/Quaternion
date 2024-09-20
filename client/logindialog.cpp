@@ -170,10 +170,10 @@ void LoginDialog::setup(const QString& statusMessage)
     });
     connect(m_connection.get(), &Connection::loginFlowsChanged, this, [this] {
         serverEdit->setText(m_connection->homeserver().toString());
-        setStatusMessage(m_connection->isUsable()
+        setStatusMessage(!m_connection->loginFlows().empty()
                              ? tr("The homeserver is available")
                              : tr("Could not connect to the homeserver"));
-        button(QDialogButtonBox::Ok)->setEnabled(m_connection->isUsable());
+        button(QDialogButtonBox::Ok)->setEnabled(!m_connection->loginFlows().isEmpty());
     });
     // This overrides the above in case of an unsuccessful attempt to resolve
     // the server URL from a changed MXID
@@ -234,15 +234,10 @@ void LoginDialog::apply()
     else if (!url.isValid())
         applyFailed(MalformedServerUrl);
     else {
-        m_connection->setHomeserver(url);
-
-        // Wait for new flows and check them
-        connectSingleShot(m_connection.get(), &Connection::loginFlowsChanged,
-                          this, [this] {
-                              qCDebug(MAIN)
-                                  << "Received login flows, trying to login";
-                              loginWithBestFlow();
-                          });
+        m_connection->setHomeserver(url).then([this](auto) {
+            qCDebug(MAIN) << "Received login flows, trying to login";
+            loginWithBestFlow();
+        });
     }
 }
 

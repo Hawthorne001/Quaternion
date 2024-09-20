@@ -101,7 +101,7 @@ Page {
                               (roomNameMetrics.text != roomNameMetrics.elidedText
                                || roomName.lineCount > 1)
                 ToolTip.visible: hovered
-                ToolTip.text: room ? room.htmlSafeDisplayName : ""
+                ToolTip.text: room?.displayNameForHtml ?? ""
             }
 
             Label {
@@ -284,7 +284,7 @@ Page {
             // 2 seconds and if yes, request the amount of messages
             // enough to scroll at this rate for 3 more seconds
             if (velocity > 0 && contentY - velocity*2 < originY)
-                room.getHistory(velocity * eventDensity * 3)
+                room.getPreviousContent(velocity * eventDensity * 3)
         }
         onContentYChanged: ensurePreviousContent()
         onContentHeightChanged: ensurePreviousContent()
@@ -470,8 +470,7 @@ Page {
         id: cachedEventsBar
 
         // A proxy property for animation
-        property int requestedHistoryEventsCount:
-            room ? room.requestedEventsCount : 0
+        property int requestedHistoryEventsCount: room?.requestedHistorySize ?? 0
         AnimationBehavior on requestedHistoryEventsCount {
             NormalNumberAnimation { }
         }
@@ -640,10 +639,9 @@ Page {
                             chatView.bottommostVisibleIndex))
                        + "\n" + qsTr("%Ln events cached", "", chatView.count)
                    : "")
-                  + (room && room.requestedEventsCount > 0
+                  + (room?.requestedHistorySize > 0
                      ? (chatView.count > 0 ? "\n" : "")
-                       + qsTr("%Ln events requested from the server",
-                              "", room.requestedEventsCount)
+                       + qsTr("%Ln events requested from the server", "", room.requestedHistorySize)
                      : "")
             horizontalAlignment: Label.AlignRight
         }
@@ -712,7 +710,7 @@ Page {
                 scrollFinisher.scrollViewTo(messageModel.readMarkerVisualIndex,
                                             ListView.Center)
             else
-                room.getHistory(chatView.count / 2) // FIXME, #799
+                room.getPreviousContent(chatView.count / 2) // FIXME, #799
         }
     }
 }

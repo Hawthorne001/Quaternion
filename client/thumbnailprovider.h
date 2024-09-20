@@ -12,5 +12,4 @@
 
 class TimelineWidget;
 
-QQuickAsyncImageProvider* makeAvatarProvider(TimelineWidget* parent);
 QQuickAsyncImageProvider* makeThumbnailProvider(TimelineWidget* parent);

@@ -86,15 +86,48 @@ void ChatEdit::contextMenuEvent(QContextMenuEvent *event)
     menu->popup(event->globalPos());
 }
 
+void ChatEdit::insertFromMimeData(const QMimeData* source) { acceptMimeData(source); }
+
 void ChatEdit::switchContext(QObject* contextKey)
 {
     cancelCompletion();
     KChatEdit::switchContext(contextKey);
 }
 
-bool ChatEdit::canInsertFromMimeData(const QMimeData *source) const
+bool ChatEdit::canInsertFromMimeData(const QMimeData* source) const
 {
+    if (!source)
+        return false;
+    // When not in a room, only allow dropping plain text (for commands)
+    if (!chatRoomWidget->currentRoom())
+        return source->hasText();
+
     return source->hasImage() || KChatEdit::canInsertFromMimeData(source);
+}
+
+QString ChatEdit::checkDndEvent(QDropEvent* event)
+{
+    if (const auto* data = event->mimeData(); data->hasHtml()) {
+        const auto [cleanHtml, errorPos, errorString] =
+            HtmlFilter::fromLocalHtml(data->html());
+        if (errorPos != -1) {
+            qCWarning(MSGINPUT) << "HTML validation failed at position"
+                                << errorPos << "with error" << errorString;
+            event->ignore();
+            return tr(
+                "Cannot insert HTML - it's either invalid or unsupported");
+        }
+    }
+    event->setDropAction(Qt::CopyAction);
+    event->accept();
+    return {};
+}
+
+void ChatEdit::dragEnterEvent(QDragEnterEvent* event)
+{
+    KChatEdit::dragEnterEvent(event);
+    if (event->source() != this)
+        checkDndEvent(event);
 }
 
 void ChatEdit::alternatePaste()
@@ -104,16 +137,15 @@ void ChatEdit::alternatePaste()
     m_pastePlaintext = pastePlaintextByDefault();
 }
 
-void ChatEdit::insertFromMimeData(const QMimeData *source)
+bool ChatEdit::acceptMimeData(const QMimeData* source)
 {
     if (!source) {
-        qCWarning(MSGINPUT) << "Nothing to insert";
-        return;
+        qCWarning(MSGINPUT) << "Nothing to insert from the drop event";
+        return true; // Treat it as nothing to do, not an error
     }
 
     if (source->hasImage())
-        chatRoomWidget->attachImage(source->imageData().value<QImage>(),
-                                    source->urls());
+        chatRoomWidget->attachImage(source->imageData().value<QImage>(), source->urls());
     else if (source->hasHtml()) {
         if (m_pastePlaintext) {
             QTextDocument document;
@@ -126,29 +158,23 @@ void ChatEdit::insertFromMimeData(const QMimeData *source)
             if (errorPos != -1) {
                 qCWarning(MSGINPUT) << "HTML insertion failed at pos"
                                     << errorPos << "with error" << errorString;
-                // FIXME: Come on... It should be app->showStatusMessage() or smth
-                emit chatRoomWidget->timelineWidget()->showStatusMessage(
-                    tr("Could not insert HTML - it's either invalid or unsupported"),
-                    5000);
-                return;
+                chatRoomWidget->showStatusMessage(
+                    tr("Could not insert HTML - it's either invalid or unsupported"), 5000);
+                return false;
             }
             insertHtml(cleanHtml);
         }
         ensureCursorVisible();
     } else if (source->hasUrls()) {
-        bool hasAnyProcessed = false;
-        for (const QUrl &url : source->urls())
-            if (url.isLocalFile()) {
-                chatRoomWidget->dropFile(url.toLocalFile());
-                hasAnyProcessed = true;
-                // Only the first url is processed for now
-                break;
-            }
-        if (!hasAnyProcessed) {
+        const auto& urls = source->urls();
+        // Only the first local url is processed for now
+        if (auto urlIt = std::ranges::find(urls, true, &QUrl::isLocalFile); urlIt != urls.cend())
+            chatRoomWidget->dropFile(urlIt->toLocalFile());
+        else
             KChatEdit::insertFromMimeData(source);
-        }
     } else
         KChatEdit::insertFromMimeData(source);
+    return true;
 }
 
 void ChatEdit::appendMentionAt(QTextCursor& cursor, QString mention,
@@ -243,7 +269,7 @@ void ChatEdit::triggerCompletion()
     QStringList matchesForSignal;
     for (const auto& p: completionMatches)
         matchesForSignal.push_back(p.first);
-    emit proposedCompletion(matchesForSignal, matchesListPosition);
+    chatRoomWidget->showCompletions(matchesForSignal, matchesListPosition);
     matchesListPosition = (matchesListPosition + 1) % completionMatches.length();
 }
 
