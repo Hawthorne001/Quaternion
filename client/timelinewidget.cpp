@@ -215,8 +215,7 @@ void TimelineWidget::showMenu(int index, const QString& hoveredLink,
         modelIndex.data(MessageEventModel::EventTypeRole).toString();
     if (eventType == "image" || eventType == "file") {
         const auto progressInfo =
-            modelIndex.data(MessageEventModel::LongOperationRole)
-                .value<Quotient::FileTransferInfo>();
+            modelIndex.data(MessageEventModel::LongOperationRole).value<Quotient::FileTransferInfo>();
         const bool downloaded = !progressInfo.isUpload
                                 && progressInfo.completed();
 

@@ -700,7 +700,7 @@ Processor::rewrite_t Processor::filterTag(QStringView tag,
                                 continue;
                             if (ff[0] == '\'' || ff[0] == '"')
                                 ff = ff.mid(1, ff.length() - 2);
-                            if (QFontDatabase().isFixedPitch(ff.toString())) {
+                            if (QFontDatabase::isFixedPitch(ff.toString())) {
                                 rewrite.emplace_back().first = "code";
                                 break;
                             }

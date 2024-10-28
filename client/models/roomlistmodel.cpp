@@ -490,8 +490,7 @@ QVariant RoomListModel::data(const QModelIndex& index, int role) const
                 for (const auto& m: directChatMembers)
                     userNames.push_back(m.htmlSafeDisplayName());
                 result += "<br>"
-                          % tr("Direct chat with %1")
-                                .arg(QLocale().createSeparatedList(userNames));
+                          % tr("Direct chat with %1").arg(QLocale().createSeparatedList(userNames));
             }
 
             if (room->usesEncryption())

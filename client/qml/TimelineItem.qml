@@ -16,11 +16,10 @@ Item {
     readonly property bool pending: marks > EventStatus.Normal
                                     && marks < EventStatus.Redacted
     readonly property bool failed: marks === EventStatus.SendingFailed
-    readonly property string authorName:
-        room && author ? room.safeMemberName(author.id) : ""
+    readonly property string authorName: author?.displayName ?? ""
     // FIXME: boilerplate with models/userlistmodel.cpp:115
     readonly property string authorColor: // contrast but not too heavy
-        Qt.hsla(author ? author.hueF : 0.0, (1-palette.window.hslSaturation),
+        Qt.hsla(author?.hueF ?? 0, (1-palette.window.hslSaturation),
                 (-0.7*palette.window.hslLightness + 0.9), palette.buttonText.a)
 
     readonly property bool actionEvent: eventType === "state"
@@ -236,25 +235,20 @@ Item {
                 horizontalAlignment: Image.AlignRight
 
                 forMember: author
-                sourceSize: Qt.size(width,
-                                    visible ? settings.minimalTimelineItemHeight
-                                            : 0)
+                sourceSize: Qt.size(width, visible ? settings.minimalTimelineItemHeight : 0)
 
                 AuthorInteractionArea { }
             }
             Label {
                 id: authorLabel
                 visible: settings.timelineStyleIsXChat
-                         || (authorSectionVisible
-                             && (!actionEvent || authorHasAvatar))
+                         || (authorSectionVisible && (!actionEvent || authorHasAvatar))
                 anchors.left: authorAvatar.right
                 anchors.leftMargin: 2
                 anchors.top: authorAvatar.top
-                width: settings.timelineStyleIsXChat
-                       ? 120 - authorAvatar.width
-                       : Math.min(textField.width, implicitWidth)
-                horizontalAlignment:
-                    actionEvent ? Text.AlignRight : Text.AlignLeft
+                width: settings.timelineStyleIsXChat ? 120 - authorAvatar.width
+                                                     : Math.min(textField.width, implicitWidth)
+                horizontalAlignment: actionEvent ? Text.AlignRight : Text.AlignLeft
                 elide: Text.ElideRight
 
                 color: authorColor
@@ -262,8 +256,7 @@ Item {
                 font.bold: !settings.timelineStyleIsXChat
                 renderType: settings.render_type
 
-                text: (actionEvent && settings.timelineStyleIsXChat ? "* " : "")
-                      + authorName
+                text: (actionEvent && settings.timelineStyleIsXChat ? "* " : "") + authorName
 
                 AuthorInteractionArea { }
             }
@@ -296,10 +289,9 @@ Item {
                 id: textField
                 height: textFieldImpl.height
                 anchors.top:
-                    !settings.timelineStyleIsXChat && authorLabel.visible
-                    ? authorLabel.bottom : authorLabel.top
-                anchors.left: (settings.timelineStyleIsXChat
-                               ? authorLabel : authorAvatar).right
+                    !settings.timelineStyleIsXChat && authorLabel.visible ? authorLabel.bottom
+                                                                          : authorLabel.top
+                anchors.left: (settings.timelineStyleIsXChat ? authorLabel : authorAvatar).right
                 anchors.leftMargin: 2
                 anchors.right: parent.right
                 anchors.rightMargin: 1
@@ -334,7 +326,7 @@ Item {
                               + (time ? toHtmlEscaped(time) : "")
                               + "</td></tr></table>"
                               + (actionEvent && !authorLabel.visible
-                                 ? ("<a href='" + (author ? author.id : "")
+                                 ? ("<a href='" + (author?.id ?? "")
                                     + "' style='text-decoration:none;color:\""
                                     + authorColor + "\";font-weight:bold'>"
                                     + toHtmlEscaped(authorName) + "</a> ")
@@ -365,8 +357,7 @@ Item {
 
                 TimelineMouseArea {
                     anchors.fill: parent
-                    cursorShape: textFieldImpl.hoveredLink
-                                 ? Qt.PointingHandCursor : Qt.IBeamCursor
+                    cursorShape: textFieldImpl.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
                     acceptedButtons: Qt.MiddleButton | Qt.RightButton
 
                     onClicked: (mouse) => {
@@ -419,18 +410,14 @@ Item {
                 anchors.right: textField.right
 
                 sourceComponent: ImageContent {
-                    property var info:
-                        !progressInfo.isUpload && !progressInfo.active &&
-                        content.info && content.info.thumbnail_info
-                        ? content.info.thumbnail_info
-                        : content.info
+                    property var info: !progressInfo.isUpload && !progressInfo.active
+                                       ? content?.info?.thumbnail_info : content.info
                     sourceSize: if (info) { Qt.size(info.w, info.h) }
                     source: downloaded || progressInfo.isUpload
                             ? progressInfo.localPath
                             : progressInfo.failed
                               ? ""
-                              : content.info && content.info.thumbnail_info
-                                && !autoload
+                              : content?.info.thumbnail_info && !autoload
                                 ? "image://thumbnail/" + content.thumbnailMediaId
                                 : ""
                     maxHeight: chatView.height - textField.height -
@@ -452,8 +439,7 @@ Item {
 
             Label {
                 id: annotationLabel
-                anchors.top: imageLoader.active ? imageLoader.bottom
-                                                : fileLoader.bottom
+                anchors.top: imageLoader.active ? imageLoader.bottom : fileLoader.bottom
                 anchors.left: textField.left
                 anchors.right: textField.right
                 height: annotation ? implicitHeight : 0
@@ -482,15 +468,13 @@ Item {
                                   + modelData.authorsCount
                             textFormat: Text.PlainText
                             font.pointSize: settings.font.pointSize - 1
-                            color: modelData.includesLocalUser
-                                       ? palette.highlight
-                                       : palette.buttonText
+                            color: modelData.includesLocalUser ? palette.highlight
+                                                               : palette.buttonText
                         }
 
                         background: Rectangle {
                             radius: 4
-                            color: reactionButton.down ? palette.button
-                                                       : "transparent"
+                            color: reactionButton.down ? palette.button : "transparent"
                             border.color: modelData.includesLocalUser
                                               ? palette.highlight
                                               : settings.disabledPalette.buttonText
@@ -629,9 +613,7 @@ Item {
 
                     MouseArea {
                         anchors.fill: parent
-                        cursorShape: parent.hoveredLink ?
-                                         Qt.PointingHandCursor :
-                                         Qt.IBeamCursor
+                        cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
                         acceptedButtons: Qt.NoButton
                     }
                 }

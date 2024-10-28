@@ -11,6 +11,7 @@
 #include <QtGui/QWindow>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QMenu>
+#include <QtCore/QFuture>
 
 #include "mainwindow.h"
 #include "quaternionroom.h"
@@ -57,9 +58,9 @@ void SystemTrayIcon::highlightCountChanged(Quotient::Room* room)
             tr("%Ln highlight(s)", "", room->highlightCount()));
         if (mode != "non-intrusive")
             m_parent->activateWindow();
-        connectSingleShot(this, &SystemTrayIcon::messageClicked, m_parent,
-                          [this,qRoom=static_cast<QuaternionRoom*>(room)]
-                          { m_parent->selectRoom(qRoom); });
+        QtFuture::connect(this, &SystemTrayIcon::messageClicked)
+            .then(m_parent, std::bind_front(&MainWindow::selectRoom, m_parent,
+                                            static_cast<QuaternionRoom*>(room)));
     }
 }
 

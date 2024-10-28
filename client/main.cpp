@@ -145,21 +145,19 @@ int main( int argc, char* argv[] )
 // Extract a number from another macro and turn it to a const char[]
 #define ITOA(i) #i
 
-    loadTranslations(
-        { { { "qt", "qtbase", "qtnetwork", "qtdeclarative", "qtmultimedia",
-              "qtquickcontrols", "qtquickcontrols2",
-              // QtKeychain tries to install its translations to Qt's path;
-              // try to look there, just in case (see also below)
-              "qtkeychain" },
-            QLibraryInfo::location(QLibraryInfo::TranslationsPath) },
-          { { "qtkeychain" },
-            QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                                   "qt" ITOA(QT_VERSION_MAJOR) "keychain/translations",
-                                   QStandardPaths::LocateDirectory) },
-          { { "qt", "qtkeychain", "quotient", "quaternion" },
-            QStandardPaths::locate(QStandardPaths::AppLocalDataLocation,
-                                   "translations",
-                                   QStandardPaths::LocateDirectory) } });
+    loadTranslations({ { { "qt", "qtbase", "qtnetwork", "qtdeclarative", "qtmultimedia",
+                           "qtquickcontrols", "qtquickcontrols2",
+                           // QtKeychain tries to install its translations to Qt's path;
+                           // try to look there, just in case (see also below)
+                           "qtkeychain" },
+                         QLibraryInfo::path(QLibraryInfo::TranslationsPath) },
+                       { { "qtkeychain" },
+                         QStandardPaths::locate(QStandardPaths::GenericDataLocation,
+                                                "qt" ITOA(QT_VERSION_MAJOR) "keychain/translations",
+                                                QStandardPaths::LocateDirectory) },
+                       { { "qt", "qtkeychain", "quotient", "quaternion" },
+                         QStandardPaths::locate(QStandardPaths::AppLocalDataLocation, "translations",
+                                                QStandardPaths::LocateDirectory) } });
 
 #undef ITOA
 

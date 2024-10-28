@@ -130,7 +130,7 @@ MainWindow::MainWindow()
 MainWindow::~MainWindow()
 {
     saveSettings();
-    for (auto* acc: qAsConst(logoutOnExit))
+    for (auto* acc: std::as_const(logoutOnExit))
         logout(acc);
     accountRegistry->disconnect(this);
 }
@@ -193,8 +193,8 @@ void MainWindow::createMenu()
     static const auto quitShortcut = QSysInfo::productType() == "windows"
                                          ? QKeySequence(Qt::CTRL | Qt::Key_Q)
                                          : QKeySequence::Quit;
-    connectionMenu->addAction(QIcon::fromTheme("application-exit"),
-        tr("&Quit"), qApp, &QApplication::quit, quitShortcut);
+    connectionMenu->addAction(QIcon::fromTheme("application-exit"), tr("&Quit"), quitShortcut, qApp,
+                              &QApplication::quit);
 
     // View menu
     auto viewMenu = menuBar()->addMenu(tr("&View"));
@@ -347,9 +347,8 @@ void MainWindow::createMenu()
     openRoomAction->setStatusTip(tr("Open a room from the room list"));
     openRoomAction->setShortcut(QKeySequence::Open);
     openRoomAction->setDisabled(true);
-    roomMenu->addAction(QIcon::fromTheme("window-close"),
-        tr("&Close current room"), [this] { selectRoom(nullptr); },
-        QKeySequence::Close);
+    roomMenu->addAction(QIcon::fromTheme("window-close"), tr("&Close current room"),
+                        QKeySequence::Close, [this] { selectRoom(nullptr); });
 
     // Settings menu
     auto settingsMenu = menuBar()->addMenu(tr("&Settings"));
