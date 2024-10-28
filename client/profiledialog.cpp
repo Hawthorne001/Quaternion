@@ -126,7 +126,7 @@ ProfileDialog::DeviceTable::DeviceTable()
 
 void updateAvatarButton(Quotient::User* user, QPushButton* btn)
 {
-    const auto img = user->avatar(128);
+    const auto img = user->avatar(128, [] {});
     if (img.isNull()) {
         btn->setText(ProfileDialog::tr("No avatar"));
         btn->setIcon({});
@@ -273,7 +273,7 @@ void ProfileDialog::load()
     auto* user = m_currentAccount->user();
     updateAvatarButton(user, m_avatar);
     connect(user, &User::defaultAvatarChanged, this,
-            [this] { updateAvatarButton(account()->user(), m_avatar); });
+            [this, user] { updateAvatarButton(user, m_avatar); });
 
     m_displayName->setText(user->name());
     m_displayName->setFocus();

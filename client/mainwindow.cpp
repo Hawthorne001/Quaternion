@@ -829,7 +829,7 @@ public:
 
     void tryConnection()
     {
-        connection->assumeIdentity(userId, accessToken);
+        connection->assumeIdentity(userId, deviceId, accessToken);
     }
     void onNetworkError(const QString& error)
     {
@@ -987,7 +987,7 @@ Quotient::UriResolveResult MainWindow::visitUser(Quotient::User* user,
                                                  const QString& action)
 {
     if (action == "mention" || action.isEmpty())
-        chatRoomWidget->insertMention(user);
+        chatRoomWidget->insertMention(user->id());
     // action=_interactive is checked in openResource() and
     // converted to "chat" in openUserInput()
     else if (action == "_interactive"
@@ -1014,16 +1014,13 @@ void MainWindow::joinRoom(Quotient::Connection* account,
                           const QString& roomAliasOrId,
                           const QStringList& viaServers)
 {
-    auto* job = account->joinRoom(roomAliasOrId, viaServers);
     // Connection::joinRoom() already connected to success() the code that
     // initialises the room in the library, which in turn causes RoomListModel
     // to update the room list. So the below connection to success() will be
     // triggered after all the initialisation have happened.
-    connect(job, &Quotient::BaseJob::success, this,
-            [this, account, roomAliasOrId] {
-                statusBar()->showMessage(
-                    tr("Joined %1 as %2").arg(roomAliasOrId, account->userId()));
-            });
+    account->joinRoom(roomAliasOrId, viaServers).then(this, [this, account, roomAliasOrId] {
+        statusBar()->showMessage(tr("Joined %1 as %2").arg(roomAliasOrId, account->userId()));
+    });
 }
 
 bool MainWindow::visitNonMatrix(const QUrl& url)
@@ -1244,23 +1241,21 @@ void MainWindow::openUserInput(bool forJoining)
             }
             QStringList completions;
             const auto& allRooms = connection->allRooms();
-            const auto& users = connection->users();
+            const auto& userIds = connection->userIds();
             // Assuming that roughly half of rooms in the room list have
             // a canonical alias; this may be quite a bit off but is better
             // than not reserving at all
-            completions.reserve(allRooms.size() * 3 / 2 + users.size());
+            completions.reserve(allRooms.size() * 3 / 2 + userIds.size());
             for (auto* room: allRooms) {
                 completions << room->id();
                 if (!room->canonicalAlias().isEmpty())
                     completions << room->canonicalAlias();
             }
 
-            for (auto* user: users)
-                completions << user->id();
+            std::ranges::copy(userIds, std::back_inserter(completions));
 
             completions.sort();
-            completions.erase(std::unique(completions.begin(), completions.end()),
-                              completions.end());
+            completions.erase(std::ranges::unique(completions).begin(), completions.end());
 
             auto* completer = new QCompleter(completions);
             completer->setFilterMode(Qt::MatchContains);

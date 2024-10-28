@@ -1,24 +1,28 @@
 #include "timelinewidget.h"
 
 #include "chatroomwidget.h"
+#include "logging_categories.h"
 #include "models/messageeventmodel.h"
 #include "thumbnailprovider.h"
-#include "logging_categories.h"
 
-#include <Quotient/settings.h>
-#include <Quotient/events/roompowerlevelsevent.h>
 #include <Quotient/events/reactionevent.h>
+#include <Quotient/events/roompowerlevelsevent.h>
+
 #include <Quotient/csapi/message_pagination.h>
+
+#include <Quotient/networkaccessmanager.h>
+#include <Quotient/settings.h>
 #include <Quotient/user.h>
 
 #include <QtQml/QQmlContext>
 #include <QtQml/QQmlEngine>
+#include <QtWidgets/QApplication>
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QMenu>
-#include <QtWidgets/QApplication>
-#include <QtGui/QDesktopServices>
-#include <QtGui/QClipboard>
+
 #include <QtCore/QStringBuilder>
+#include <QtGui/QClipboard>
+#include <QtGui/QDesktopServices>
 
 using Quotient::operator""_ls;
 
@@ -33,18 +37,13 @@ TimelineWidget::TimelineWidget(ChatRoomWidget* chatRoomWidget)
     qmlRegisterUncreatableType<QuaternionRoom>(
         "Quotient", 1, 0, "Room",
         "Room objects can only be created by libQuotient");
-    qmlRegisterUncreatableType<User>(
-        "Quotient", 1, 0, "User",
-        "User objects can only be created by libQuotient");
+    qmlRegisterAnonymousType<RoomMember>("Quotient", 1);
     qmlRegisterAnonymousType<GetRoomEventsJob>("Quotient", 1);
     qmlRegisterAnonymousType<MessageEventModel>("Quotient", 1);
-    qRegisterMetaType<GetRoomEventsJob*>("GetRoomEventsJob*");
-    qRegisterMetaType<User*>("User*");
     qmlRegisterType<Settings>("Quotient", 1, 0, "Settings");
 
     setResizeMode(SizeRootObjectToView);
 
-    engine()->addImageProvider("avatar"_ls, makeAvatarProvider(this));
     engine()->addImageProvider("thumbnail"_ls, makeThumbnailProvider(this));
 
     auto* ctxt = rootContext();
@@ -179,13 +178,7 @@ void TimelineWidget::showMenu(int index, const QString& hoveredLink,
     auto menu = new QMenu(this);
     menu->setAttribute(Qt::WA_DeleteOnClose);
 
-    const auto* plEvt =
-        currentRoom()->currentState().get<Quotient::RoomPowerLevelsEvent>();
-    const auto localUserId = currentRoom()->localUser()->id();
-    const int userPl = plEvt ? plEvt->powerLevelForUser(localUserId) : 0;
-    const auto* modelUser =
-        modelIndex.data(MessageEventModel::AuthorRole).value<Quotient::User*>();
-    if (!plEvt || userPl >= plEvt->redact() || localUserId == modelUser->id())
+    if (currentRoom()->canRedact(eventId))
         menu->addAction(QIcon::fromTheme("edit-delete"), tr("Redact"), this,
                         [this, eventId] { currentRoom()->redactEvent(eventId); });
 
@@ -265,7 +258,7 @@ void TimelineWidget::reactionButtonClicked(const QString& eventId,
     for (const auto& a: annotations)
         if (auto* e = eventCast<const ReactionEvent>(a);
             e != nullptr && e->key() == key
-            && a->senderId() == currentRoom()->localUser()->id()) //
+            && a->senderId() == currentRoom()->localMember().id()) //
         {
             currentRoom()->redactEvent(a->id());
             return;

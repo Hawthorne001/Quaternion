@@ -180,10 +180,10 @@ void MessageEventModel::changeRoom(QuaternionRoom* room)
                 this, &MessageEventModel::refreshEvent);
         qCDebug(EVENTMODEL)
             << "Event model connected to room" << room->objectName() //
-            << "as" << room->localUser()->id();
+            << "as" << room->localMember().id();
         // If the timeline isn't loaded, ask for at least something right away
         if (room->timelineSize() == 0)
-            room->getHistory(30);
+            room->getPreviousContent(30);
     }
     endResetModel();
     emit readMarkerUpdated();
@@ -472,12 +472,11 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
         return switchOnType(evt
             , [this] (const RoomMessageEvent& e) {
                 // clang-format on
-                using namespace MessageEventContent;
+                using namespace Quotient::EventContent;
 
-                if (e.hasTextContent() && e.mimeType().name() != "text/plain") {
+                if (e.has<TextContent>() && e.mimeType().name() != "text/plain") {
                     // Naïvely assume that it's HTML
-                    auto htmlBody =
-                        static_cast<const TextContent*>(e.content())->body;
+                    auto htmlBody = e.get<TextContent>()->body;
                     auto [cleanHtml, errorPos, errorString] =
                         HtmlFilter::fromMatrixHtml(htmlBody, m_currentRoom);
                     // If HTML is bad (or it's not HTML at all), fall back
@@ -493,9 +492,8 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
                     }
                     return cleanHtml;
                 }
-                if (e.hasFileContent()) {
-                    auto fileCaption =
-                        e.content()->fileInfo()->originalName.toHtmlEscaped();
+                if (const auto fileContent = e.get<FileContentBase>()) {
+                    auto fileCaption = fileContent->commonInfo().originalName.toHtmlEscaped();
                     if (fileCaption.isEmpty())
                         fileCaption = m_currentRoom->prettyPrint(e.plainBody());
                     return !fileCaption.isEmpty() ? fileCaption : tr("a file");
@@ -507,7 +505,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
                 // clang-format on
                 // FIXME: Rewind to the name that was at the time of this event
                 const auto subjectName =
-                    m_currentRoom->safeMemberName(e.userId()).toHtmlEscaped();
+                    m_currentRoom->member(e.userId()).htmlSafeDisambiguatedName();
                 // The below code assumes senderName output in AuthorRole
                 switch( e.membership() )
                 {
@@ -671,7 +669,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
             return settings.get(QStringLiteral("UI/highlight_color"),
                                 QStringLiteral("orange"));
 
-        if (isPending || evt.senderId() == m_currentRoom->localUser()->id())
+        if (isPending || evt.senderId() == m_currentRoom->localMember().id())
             normalTextColor = mixColors(normalTextColor,
                             settings.get(QStringLiteral("UI/outgoing_color"),
                                          QStringLiteral("#4A8780")), 0.5);
@@ -700,7 +698,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
                 case MessageEventType::Image:
                     return "image";
                 default:
-                    return e->hasFileContent() ? "file" : "message";
+                    return e->has<EventContent::FileContentBase>() ? "file" : "message";
             }
         }
         if (evt.isStateEvent())
@@ -714,14 +712,13 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
 
     if( role == AuthorRole )
     {
-        // FIXME: It shouldn't be User, it should be its state "as of event"
-        return QVariant::fromValue(isPending
-                                   ? m_currentRoom->localUser()
-                                   : m_currentRoom->user(evt.senderId()));
+        // TODO: It should be RoomMember state "as of event", not "as of now"
+        return QVariant::fromValue(isPending ? m_currentRoom->localMember()
+                                             : m_currentRoom->member(evt.senderId()));
     }
 
     if (role == AuthorHasAvatarRole) {
-        return m_currentRoom->memberAvatarUrl(evt.senderId()).isValid();
+        return m_currentRoom->member(evt.senderId()).avatarUrl().isValid();
     }
 
     if (role == ContentTypeRole)
@@ -750,7 +747,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
             // Cannot use e.contentJson() here because some
             // EventContent classes inject values into the copy of the
             // content JSON stored in EventContent::Base
-            return e->hasFileContent()
+            return e->has<EventContent::FileContentBase>()
                     ? QVariant::fromValue(e->content()->originalJson)
                     : QVariant();
         }
@@ -809,8 +806,8 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
             }
         }
         if (memberEvent || evt.isRedacted()) {
-            if (evt.senderId() != m_currentRoom->localUser()->id()
-                && evt.stateKey() != m_currentRoom->localUser()->id()
+            if (evt.senderId() != m_currentRoom->localMember().id()
+                && evt.stateKey() != m_currentRoom->localMember().id()
                 && !settings.get<bool>("UI/show_spammy")) {
 //                QElapsedTimer et; et.start();
                 auto hide = !isUserActivityNotable(timelineIt);
@@ -842,7 +839,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
     if( role == LongOperationRole )
     {
         if (auto e = eventCast<const RoomMessageEvent>(&evt))
-            if (e->hasFileContent())
+            if (e->has<EventContent::FileContentBase>())
                 return QVariant::fromValue(
                             m_currentRoom->fileTransferInfo(
                                 isPending ? e->transactionId() : e->id()));
@@ -871,9 +868,9 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
                 if (rIt == reactions.end())
                     rIt = reactions.insert(reactions.end(), { e->key() });
 
-                rIt->authorsList << m_currentRoom->safeMemberName(e->senderId());
+                rIt->authorsList << m_currentRoom->member(e->senderId()).displayName();
                 rIt->includesLocalUser |=
-                        e->senderId() == m_currentRoom->localUser()->id();
+                        e->senderId() == m_currentRoom->localMember().id();
             }
         // Prepare the QML model data
         // NB: Strings are NOT HTML-escaped; QML code must take care to use

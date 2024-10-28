@@ -107,38 +107,7 @@ ChatRoomWidget::ChatRoomWidget(MainWindow* parent)
                 ? m_chatEdit->textCursor().selectedText()
                 : m_timelineWidget->selectedText());
     });
-    connect(m_chatEdit, &ChatEdit::proposedCompletion, this,
-            [this](QStringList matches, int pos) {
-                Q_ASSERT(pos >= 0 && pos < matches.size());
-                // If the completion list is MaxNamesToShow or shorter, show all
-                // of it; if it's longer, show SampleSizeForHud entries and
-                // append how many more matches are there.
-                // #344: in any case, drop the current match from the list
-                // ("Next completion:" showing the current match looks wrong)
-
-                switch (matches.size()) {
-                case 0:
-                    setHudHtml(tr("No completions"));
-                    return;
-                case 1:
-                    setHudHtml({}); // That one match is already in the text
-                    return;
-                default:;
-                }
-                matches.removeAt(pos); // Drop the current match (#344)
-
-                // Replenish the tail of the list from the beginning, if needed
-                std::rotate(matches.begin(), matches.begin() + pos,
-                            matches.end());
-                if (matches.size() > MaxNamesToShow) {
-                    const auto moreIt = matches.begin() + SampleSizeForHud;
-                    *moreIt = tr("%Ln more completions", "",
-                                 matches.size() - SampleSizeForHud);
-                    matches.erase(moreIt + 1, matches.end());
-                }
-                setHudHtml(tr("Next completion:"), matches);
-            });
-    // When completion is cancelled, show typing users, if any
+    // When completion is cancelled, revert to showing typing users, if any
     connect(m_chatEdit, &ChatEdit::cancelledCompletion,
             this, &ChatRoomWidget::typingChanged);
 
@@ -155,6 +124,7 @@ ChatRoomWidget::ChatRoomWidget(MainWindow* parent)
         if (!styleSheet.isEmpty())
             setStyleSheet(styleSheet);
     }
+    setAcceptDrops(true); // see dragEnteredEvent(), dropEvent()
 
     auto* layout = new QVBoxLayout();
     layout->addWidget(m_timelineWidget);
@@ -183,6 +153,11 @@ QuaternionRoom* ChatRoomWidget::currentRoom() const
     return m_timelineWidget->currentRoom();
 }
 
+Quotient::Connection* ChatRoomWidget::currentConnection() const
+{
+    return currentRoom()->connection();
+}
+
 void ChatRoomWidget::setRoom(QuaternionRoom* newRoom)
 {
     if (currentRoom() == newRoom) {
@@ -191,7 +166,7 @@ void ChatRoomWidget::setRoom(QuaternionRoom* newRoom)
     }
 
     if (currentRoom()) {
-        currentRoom()->connection()->disconnect(this);
+        currentConnection()->disconnect(this);
         currentRoom()->disconnect(this);
     }
     cancelAttaching();
@@ -217,24 +192,24 @@ void ChatRoomWidget::setRoom(QuaternionRoom* newRoom)
 
 void ChatRoomWidget::typingChanged()
 {
-    if (!currentRoom() || currentRoom()->usersTyping().isEmpty())
+    if (!currentRoom() || currentRoom()->membersTyping().isEmpty())
     {
         setHudHtml({});
         return;
     }
-    const auto& usersTyping = currentRoom()->usersTyping();
+    const auto& membersTyping = currentRoom()->membersTyping();
+    const auto endIt = membersTyping.size() > MaxNamesToShow
+                       ? membersTyping.cbegin() + SampleSizeForHud
+                       : membersTyping.cend();
     QStringList typingNames;
     typingNames.reserve(MaxNamesToShow);
-    const auto endIt = usersTyping.size() > MaxNamesToShow
-                       ? usersTyping.cbegin() + SampleSizeForHud
-                       : usersTyping.cend();
-    for (auto it = usersTyping.cbegin(); it != endIt; ++it)
-        typingNames << currentRoom()->safeMemberName((*it)->id());
+    std::transform(membersTyping.cbegin(), endIt, std::back_inserter(typingNames),
+                   std::mem_fn(&Quotient::RoomMember::disambiguatedName));
 
-    if (usersTyping.size() > MaxNamesToShow) {
+    if (membersTyping.size() > MaxNamesToShow) {
         typingNames.push_back(
             //: The number of users in the typing or completion list
-            tr("%L1 more").arg(usersTyping.size() - SampleSizeForHud));
+            tr("%L1 more").arg(membersTyping.size() - SampleSizeForHud));
     }
     setHudHtml(tr("Currently typing:"), typingNames);
 }
@@ -245,7 +220,7 @@ void ChatRoomWidget::encryptionChanged()
         currentRoom()
             ? tr("Send a message (over %1) or enter a command...",
                  "%1 is the protocol used by the server (usually HTTPS)")
-                  .arg(currentRoom()->connection()->homeserver().scheme().toUpper())
+                  .arg(currentConnection()->homeserver().scheme().toUpper())
             : DefaultPlaceholderText());
 }
 
@@ -284,12 +259,48 @@ void ChatRoomWidget::setHudHtml(const QString& htmlCaption,
     m_hudCaption->setText(hudText);
 }
 
-void ChatRoomWidget::insertMention(Quotient::User* user)
+void ChatRoomWidget::showStatusMessage(const QString& message, int timeout)
+{
+    mainWindow()->showStatusMessage(message, timeout);
+}
+
+void ChatRoomWidget::showCompletions(QStringList matches, int pos)
+{
+    Q_ASSERT(pos >= 0 && pos < matches.size());
+    // If the completion list is MaxNamesToShow or shorter, show all
+    // of it; if it's longer, show SampleSizeForHud entries and
+    // append how many more matches are there.
+    // #344: in any case, drop the current match from the list
+    // ("Next completion:" showing the current match looks wrong)
+
+    switch (matches.size()) {
+    case 0:
+        setHudHtml(tr("No completions"));
+        return;
+    case 1:
+        setHudHtml({}); // That one match is already in the text
+        return;
+    default:;
+    }
+    matches.removeAt(pos); // Drop the current match (#344)
+
+           // Replenish the tail of the list from the beginning, if needed
+    std::rotate(matches.begin(), matches.begin() + pos,
+                matches.end());
+    if (matches.size() > MaxNamesToShow) {
+        matches[SampleSizeForHud] =
+            tr("%Ln more completions", "", static_cast<int>(matches.size() - SampleSizeForHud));
+        matches.resize(SampleSizeForHud);
+    }
+    setHudHtml(tr("Next completion:"), matches);
+}
+
+void ChatRoomWidget::insertMention(const QString& userId)
 {
     Q_ASSERT(currentRoom() != nullptr);
-    m_chatEdit->insertMention(
-        user->displayname(currentRoom()),
-        Quotient::Uri(user->id()).toUrl(Quotient::Uri::MatrixToUri));
+    const auto member = currentRoom()->member(userId);
+    m_chatEdit->insertMention(member.displayName(),
+                              Quotient::Uri(member.id()).toUrl(Quotient::Uri::MatrixToUri));
     m_chatEdit->setFocus();
 }
 
@@ -312,12 +323,12 @@ void ChatRoomWidget::attachImage(const QImage& img, const QList<QUrl>& sources)
     m_attachAction->setChecked(true);
     m_chatEdit->setPlaceholderText(AttachedPlaceholderText());
     mainWindow()->showStatusMessage(tr("Attaching the pasted image"));
-    // TODO, 0.0.97: tr("... from %1").arg(localPath)
 }
 
 QString ChatRoomWidget::attachFile(const QString& localPath)
 {
-    Q_ASSERT(currentRoom() != nullptr);
+    if (QUO_ALARM(currentRoom() == nullptr))
+        return tr("Can't attach a file without a selected room");
 
     qCDebug(MSGINPUT) << "Trying to attach" << localPath;
     m_fileToAttach = std::make_unique<QFile>(localPath);
@@ -341,13 +352,11 @@ void ChatRoomWidget::dropFile(const QString& localPath)
 QString ChatRoomWidget::checkAttachment()
 {
     Q_ASSERT(m_fileToAttach != nullptr);
-    if (m_fileToAttach->isReadable()
-        || m_fileToAttach->open(QIODevice::ReadOnly))
+    if (m_fileToAttach->isReadable() || m_fileToAttach->open(QIODevice::ReadOnly))
         return {};
 
     // Form the message in advance while the file name is still there
-    const auto msg =
-        tr("%1 is not readable or not a file").arg(m_fileToAttach->fileName());
+    const auto msg = tr("%1 is not readable or not a file").arg(m_fileToAttach->fileName());
     cancelAttaching();
     return msg;
 }
@@ -388,35 +397,36 @@ QVector<QString> lazySplitRef(const QString& s, QChar sep, int maxParts)
     return parts;
 }
 
-Quotient::EventContent::TypedBase* contentFromFile(const QFileInfo& file)
+std::unique_ptr<Quotient::EventContent::FileContentBase> contentFromFile(const QFileInfo& file)
 {
     using namespace Quotient::EventContent;
+    using namespace Quotient::Literals;
     auto filePath = file.absoluteFilePath();
     auto localUrl = QUrl::fromLocalFile(filePath);
     auto mimeType = QMimeDatabase().mimeTypeForFile(file);
 
     auto mimeTypeName = mimeType.name();
-    if (mimeTypeName.startsWith("image/"))
-        return new ImageContent(localUrl, file.size(), mimeType,
-                                QImageReader(filePath).size(), file.fileName());
+    if (mimeTypeName.startsWith("image/"_L1))
+        return std::make_unique<ImageContent>(localUrl, file.size(), mimeType,
+                                              QImageReader(filePath).size(), file.fileName());
 
-    if (mimeTypeName.startsWith("audio/"))
-        return new AudioContent(localUrl, file.size(), mimeType,
-                                file.fileName());
+    if (mimeTypeName.startsWith("audio/"_L1))
+        return std::make_unique<AudioContent>(localUrl, file.size(), mimeType, file.fileName());
 
     // TODO: video files support
 
-    return new FileContent(localUrl, file.size(), mimeType, file.fileName());
+    return std::make_unique<FileContent>(localUrl, file.size(), mimeType, file.fileName());
 }
 
 QString ChatRoomWidget::sendFile()
 {
     Q_ASSERT(currentRoom() != nullptr);
     const auto& description = m_chatEdit->toPlainText();
-    if (const auto error = checkAttachment(); !error.isEmpty())
-        return error;
-
     QFileInfo fileInfo(*m_fileToAttach);
+    if (!fileInfo.isReadable() || !fileInfo.isFile())
+        return tr("%1 is not readable or not a file")
+            .arg(m_fileToAttach->fileName());
+
     currentRoom()->postFile(description.isEmpty() ? fileInfo.fileName()
                                                   : description,
                             contentFromFile(fileInfo));
@@ -519,7 +529,7 @@ QString ChatRoomWidget::sendCommand(QStringView command,
             return tr("%1 doesn't look like a room id or alias").arg(argString);
 
         // Forget the specified room using the current room's connection
-        currentRoom()->connection()->forgetRoom(argString);
+        currentConnection()->forgetRoom(argString);
         return {};
     }
     if (command == u"invite")
@@ -569,7 +579,7 @@ QString ChatRoomWidget::sendCommand(QStringView command,
         if (!argString.contains(UserIdRE))
             return tr("/ignore argument doesn't look like a user ID");
 
-        if (auto* user = currentRoom()->user(argString))
+        if (auto* user = currentConnection()->user(argString))
         {
             if (command == u"ignore")
                 user->ignore();
@@ -612,12 +622,12 @@ QString ChatRoomWidget::sendCommand(QStringView command,
     }
     if (command == u"nick" || command == u"mynick")
     {
-        currentRoom()->localUser()->rename(argString);
+        currentConnection()->user()->rename(argString);
         return {};
     }
     if (command == u"roomnick" || command == u"myroomnick")
     {
-        currentRoom()->localUser()->rename(argString, currentRoom());
+        currentConnection()->user()->rename(argString, currentRoom());
         return {};
     }
     if (command == u"pm" || command == u"msg")
@@ -634,15 +644,13 @@ QString ChatRoomWidget::sendCommand(QStringView command,
                 return {};
             }
             return tr("%1 doesn't seem to have joined room %2")
-                   .arg(currentRoom()->localUser()->id(), args.front());
+                   .arg(currentRoom()->localMember().id(), args.front());
         }
         if (UserIdRE.match(args.front()).hasMatch())
         {
-            if (args.back().isEmpty())
-                currentRoom()->connection()->requestDirectChat(args.front());
-            else
-                currentRoom()->connection()->doInDirectChat(args.front(),
-                    [msg=args.back()] (Room* dc) { dc->postPlainText(msg); });
+            auto futureChat = currentConnection()->getDirectChat(args.front());
+            if (!args.back().isEmpty())
+                futureChat.then([msg=args.back()] (Room* dc) { dc->postPlainText(msg); });
             return {};
         }
 
@@ -695,7 +703,7 @@ QString ChatRoomWidget::sendCommand(QStringView command,
         if (!argString.contains(UserIdRE))
             return tr("%1 doesn't look like a user id").arg(argString);
 
-        currentRoom()->connection()->requestDirectChat(argString);
+        currentConnection()->requestDirectChat(argString);
         return {};
     }
     // --- Add more room commands here
@@ -726,7 +734,7 @@ void ChatRoomWidget::sendInput()
             sendMessage();
     }
     if (!error.isEmpty()) {
-        mainWindow()->showStatusMessage(error, 5000);
+        showStatusMessage(error, 5000);
         return;
     }
     m_chatEdit->setPlaceholderText(DefaultPlaceholderText());
@@ -738,14 +746,13 @@ ChatRoomWidget::findCompletionMatches(const QString& pattern) const
 {
     completions_t matches;
     if (currentRoom()) {
-        const auto& users = currentRoom()->users();
-        for (auto user: users) {
+        const auto& members = currentRoom()->joinedMembers();
+        for (const auto& m: members) {
             using Quotient::Uri;
-            if (user->displayname(currentRoom())
+            if (m.displayName()
                     .startsWith(pattern, Qt::CaseInsensitive)
-                || user->id().startsWith(pattern, Qt::CaseInsensitive))
-                matches.push_back({ user->displayname(currentRoom()),
-                                    Uri(user->id()).toUrl(Uri::MatrixToUri) });
+                || m.id().startsWith(pattern, Qt::CaseInsensitive))
+                matches.push_back({ m.displayName(), Uri(m.id()).toUrl(Uri::MatrixToUri) });
         }
         std::sort(matches.begin(), matches.end(),
             [] (const auto& p1, const auto& p2)
@@ -806,6 +813,52 @@ void ChatRoomWidget::keyPressEvent(QKeyEvent* event)
         emit m_timelineWidget->pageDownPressed();
         break;
     }
+}
+
+void ChatRoomWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->source() == m_chatEdit
+        || !m_chatEdit->canInsertFromMimeData(event->mimeData())) {
+        event->ignore();
+        return;
+    }
+    m_chatEdit->checkDndEvent(event);
+}
+
+void ChatRoomWidget::dropEvent(QDropEvent* event)
+{
+    Q_ASSERT(event != nullptr); // Something very wrong with Qt if that fails
+    auto* source = event->mimeData();
+    if (!source) {
+        qCWarning(MSGINPUT) << "Nothing to insert from the drop event";
+        return;
+    }
+
+    event->setDropAction(Qt::CopyAction); // A default, but you never know
+    qCDebug(MSGINPUT) << "MIME arrived:" << source->formats().join(u',');
+    if (source->hasUrls())
+        qCDebug(MSGINPUT) << "MIME URLs:" << source->urls();
+    if (source->hasImage()) {
+        attachImage(source->imageData().value<QImage>(), source->urls());
+        event->accept();
+    } else if (source->hasHtml()) {
+        if (m_chatEdit->acceptMimeData(source))
+            event->accept();
+        return;
+    } else if (source->hasUrls()) {
+        bool hasAnyProcessed = false;
+        for (const QUrl& url : source->urls())
+            if (url.isLocalFile()) {
+                attachFile(url.toLocalFile());
+                hasAnyProcessed = true;
+                // Only the first url is processed for now
+                break;
+            }
+        if (hasAnyProcessed)
+            event->accept();
+    }
+    if (m_chatEdit->acceptMimeData(source))
+        event->accept();
 }
 
 int ChatRoomWidget::maximumChatEditHeight() const
