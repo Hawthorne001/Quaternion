@@ -28,7 +28,6 @@ class ChatEdit : public KChatEdit
 
         void insertMention(QString author, QUrl url);
         bool acceptMimeData(const QMimeData* source);
-        QString checkDndEvent(QDropEvent* event);
 
         // NB: the following virtual functions are protected in QTextEdit but
         //     ChatRoomWidget delegates to them

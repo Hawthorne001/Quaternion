@@ -30,13 +30,15 @@ class ChatRoomWidget : public QWidget
 {
         Q_OBJECT
     public:
-        using completions_t = ChatEdit::completions_t;
-
         explicit ChatRoomWidget(MainWindow* parent = nullptr);
         TimelineWidget* timelineWidget() const;
         QuaternionRoom* currentRoom() const;
 
-        completions_t findCompletionMatches(const QString& pattern) const;
+        // Helpers for m_chatEdit
+
+        ChatEdit::completions_t findCompletionMatches(const QString& pattern) const;
+        QString matrixHtmlFromMime(const QMimeData* data) const;
+        void checkDndEvent(QDropEvent* event) const;
 
     public slots:
         void setRoom(QuaternionRoom* newRoom);
@@ -52,7 +54,7 @@ class ChatRoomWidget : public QWidget
         void setHudHtml(const QString& htmlCaption,
                         const QStringList& plainTextNames = {});
 
-        void showStatusMessage(const QString& message, int timeout = 0);
+        void showStatusMessage(const QString& message, int timeout = 0) const;
         void showCompletions(QStringList matches, int pos);
 
         void typingChanged();

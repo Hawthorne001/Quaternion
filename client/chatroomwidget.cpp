@@ -43,6 +43,8 @@
 #include "htmlfilter.h"
 #include "logging_categories.h"
 
+using namespace Qt::StringLiterals;
+
 static auto DefaultPlaceholderText()
 {
     return ChatRoomWidget::tr(
@@ -259,7 +261,7 @@ void ChatRoomWidget::setHudHtml(const QString& htmlCaption,
     m_hudCaption->setText(hudText);
 }
 
-void ChatRoomWidget::showStatusMessage(const QString& message, int timeout)
+void ChatRoomWidget::showStatusMessage(const QString& message, int timeout) const
 {
     mainWindow()->showStatusMessage(message, timeout);
 }
@@ -722,9 +724,8 @@ void ChatRoomWidget::sendInput()
             error = NothingToSendMsg();
         else if (text.startsWith('/')
                  && !QStringView(text).mid(1).startsWith('/')) {
-            QRegularExpression cmdSplit(
-                    "(\\w+)(?:\\s+(.*))?",
-                    QRegularExpression::DotMatchesEverythingOption);
+            static QRegularExpression cmdSplit(u"(\\w+)(?:\\s+(.*))?"_s,
+                                               QRegularExpression::DotMatchesEverythingOption);
             const auto& blanksMatch = cmdSplit.match(text, 1);
             error = sendCommand(blanksMatch.capturedView(1),
                                 blanksMatch.captured(2));
@@ -741,23 +742,22 @@ void ChatRoomWidget::sendInput()
     m_chatEdit->saveInput();
 }
 
-ChatRoomWidget::completions_t
-ChatRoomWidget::findCompletionMatches(const QString& pattern) const
+ChatEdit::completions_t ChatRoomWidget::findCompletionMatches(const QString& pattern) const
 {
-    completions_t matches;
-    if (currentRoom()) {
-        const auto& members = currentRoom()->joinedMembers();
-        for (const auto& m: members) {
-            using Quotient::Uri;
-            if (m.displayName()
-                    .startsWith(pattern, Qt::CaseInsensitive)
-                || m.id().startsWith(pattern, Qt::CaseInsensitive))
-                matches.push_back({ m.displayName(), Uri(m.id()).toUrl(Uri::MatrixToUri) });
-        }
-        std::sort(matches.begin(), matches.end(),
-            [] (const auto& p1, const auto& p2)
-                { return p1.first.localeAwareCompare(p2.first) < 0; });
+    if (!currentRoom())
+        return {};
+
+    ChatEdit::completions_t matches;
+    const auto& members = currentRoom()->joinedMembers();
+    for (const auto& m: members) {
+        using Quotient::Uri;
+        if (m.displayName().startsWith(pattern, Qt::CaseInsensitive)
+            || m.id().startsWith(pattern, Qt::CaseInsensitive))
+            matches.emplace_back(m.displayName(), Uri(m.id()).toUrl(Uri::MatrixToUri));
     }
+    std::ranges::sort(matches, [](const auto& p1, const auto& p2) {
+        return p1.first.localeAwareCompare(p2.first) < 0;
+    });
     return matches;
 }
 
@@ -822,7 +822,7 @@ void ChatRoomWidget::dragEnterEvent(QDragEnterEvent* event)
         event->ignore();
         return;
     }
-    m_chatEdit->checkDndEvent(event);
+    checkDndEvent(event);
 }
 
 void ChatRoomWidget::dropEvent(QDropEvent* event)
@@ -859,6 +859,28 @@ void ChatRoomWidget::dropEvent(QDropEvent* event)
     }
     if (m_chatEdit->acceptMimeData(source))
         event->accept();
+}
+
+QString ChatRoomWidget::matrixHtmlFromMime(const QMimeData* data) const
+{
+    QUO_CHECK(data->hasHtml());
+    const auto [cleanHtml, errorPos, errorString] = HtmlFilter::fromLocalHtml(data->html());
+    if (errorPos != -1) {
+        qCWarning(MSGINPUT) << "HTML validation failed at position" << errorPos << "with error"
+                            << errorString;
+        showStatusMessage(tr("Cannot insert HTML - it's either invalid or unsupported"), 5000);
+    }
+    return cleanHtml;
+}
+
+void ChatRoomWidget::checkDndEvent(QDropEvent* event) const
+{
+    // `event` may originally come to m_chatEdit or be a QDragEnterEvent instead - all that is fine
+    if (const auto* data = event->mimeData(); data->hasHtml() && matrixHtmlFromMime(data).isEmpty())
+        event->ignore();
+
+    event->setDropAction(Qt::CopyAction);
+    event->accept();
 }
 
 int ChatRoomWidget::maximumChatEditHeight() const

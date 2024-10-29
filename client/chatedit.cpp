@@ -105,29 +105,11 @@ bool ChatEdit::canInsertFromMimeData(const QMimeData* source) const
     return source->hasImage() || KChatEdit::canInsertFromMimeData(source);
 }
 
-QString ChatEdit::checkDndEvent(QDropEvent* event)
-{
-    if (const auto* data = event->mimeData(); data->hasHtml()) {
-        const auto [cleanHtml, errorPos, errorString] =
-            HtmlFilter::fromLocalHtml(data->html());
-        if (errorPos != -1) {
-            qCWarning(MSGINPUT) << "HTML validation failed at position"
-                                << errorPos << "with error" << errorString;
-            event->ignore();
-            return tr(
-                "Cannot insert HTML - it's either invalid or unsupported");
-        }
-    }
-    event->setDropAction(Qt::CopyAction);
-    event->accept();
-    return {};
-}
-
 void ChatEdit::dragEnterEvent(QDragEnterEvent* event)
 {
     KChatEdit::dragEnterEvent(event);
     if (event->source() != this)
-        checkDndEvent(event);
+        chatRoomWidget->checkDndEvent(event);
 }
 
 void ChatEdit::alternatePaste()
@@ -153,15 +135,10 @@ bool ChatEdit::acceptMimeData(const QMimeData* source)
             insertPlainText(document.toPlainText());
         } else {
             // Before insertion, remove formatting unsupported in Matrix
-            const auto [cleanHtml, errorPos, errorString] =
-                HtmlFilter::fromLocalHtml(source->html());
-            if (errorPos != -1) {
-                qCWarning(MSGINPUT) << "HTML insertion failed at pos"
-                                    << errorPos << "with error" << errorString;
-                chatRoomWidget->showStatusMessage(
-                    tr("Could not insert HTML - it's either invalid or unsupported"), 5000);
+            const auto cleanHtml = chatRoomWidget->matrixHtmlFromMime(source);
+            if (cleanHtml.isEmpty())
                 return false;
-            }
+
             insertHtml(cleanHtml);
         }
         ensureCursorVisible();
