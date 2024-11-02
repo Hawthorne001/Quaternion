@@ -258,9 +258,22 @@ int MessageEventModel::findRow(const QString& id, bool includePending) const
     return -1;
 }
 
-inline bool hasValidTimestamp(const Quotient::TimelineItem& ti)
+namespace {
+inline std::optional<QDateTime> getTimestamp(auto from, auto to)
 {
-    return ti->originTimestamp().isValid();
+    if (auto it = std::find_if(from, to,
+                               [](const Quotient::TimelineItem& ti) {
+                                   return ti->originTimestamp().isValid();
+                               });
+        it != to)
+        return QDateTime(it->event()->originTimestamp().date(), { 0, 0 }
+#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
+                         ,
+                         Qt::LocalTime
+#endif
+        );
+    return std::nullopt;
+}
 }
 
 QDateTime MessageEventModel::makeMessageTimestamp(
@@ -272,12 +285,11 @@ QDateTime MessageEventModel::makeMessageTimestamp(
 
     // The event is most likely redacted or just invalid.
     // Look for the nearest date around and slap zero time to it.
-    if (auto rit = std::find_if(baseIt, timeline.rend(), hasValidTimestamp);
-            rit != timeline.rend())
-        return { rit->event()->originTimestamp().date(), {0,0}, Qt::LocalTime };
-    if (auto it = std::find_if(baseIt.base(), timeline.end(), hasValidTimestamp);
-            it != timeline.end())
-        return { it->event()->originTimestamp().date(), {0,0}, Qt::LocalTime };
+    if (auto closestPastTs = getTimestamp(baseIt, timeline.rend()))
+        return *closestPastTs;
+
+    if (auto closestFutureTs = getTimestamp(baseIt.base(), timeline.end()))
+        return *closestFutureTs;
 
     // What kind of room is that?..
     qCCritical(EVENTMODEL) << "No valid timestamps in the room timeline!";
