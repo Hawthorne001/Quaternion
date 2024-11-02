@@ -61,18 +61,10 @@ else()
     endforeach ()
 endif()
 
-option(BUILD_WITH_QT6 "Build with Qt 6 (instead of Qt 5)" ON)
-
-if (BUILD_WITH_QT6)
-    set(QtMinVersion "6.2")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
-    set(QUOTIENT "QuotientQt6")
-else()
-    set(QtMinVersion "5.15")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13")
-    set(QUOTIENT "Quotient")
-endif()
-string(REGEX REPLACE "^(.).*" "Qt\\1" Qt ${QtMinVersion}) # makes "Qt5" or "Qt6"
+set(QtMinVersion "6.4")
+set(QUOTIENT "QuotientQt6")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+string(REGEX REPLACE "^(.).*" "Qt\\1" Qt ${QtMinVersion}) # makes "Qt<MajorVersionDigit>"
 
 # Find the libraries
 find_package(${Qt} ${QtMinVersion} REQUIRED
@@ -107,7 +99,7 @@ if ((NOT DEFINED USE_INTREE_LIBQMC OR USE_INTREE_LIBQMC)
     endif ()
 endif ()
 if (NOT USE_INTREE_LIBQMC)
-    find_package(${QUOTIENT} 0.8 REQUIRED)
+    find_package(${QUOTIENT} 0.9 REQUIRED)
     if (NOT ${QUOTIENT}_FOUND)
         message(WARNING "libQuotient not found; configuration will most likely fail.")
         message(WARNING "Make sure you have installed libQuotient development files")
