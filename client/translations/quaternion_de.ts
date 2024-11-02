@@ -160,6 +160,14 @@
         <source>Attaching the pasted image</source>
         <translation>Anhängen des eingefügten Bildes</translation>
     </message>
+    <message>
+        <source>Can&apos;t attach a file without a selected room</source>
+        <translation>Kann keine Datei ohne einen ausgewählten Raum anhängen</translation>
+    </message>
+    <message>
+        <source>Cannot insert HTML - it&apos;s either invalid or unsupported</source>
+        <translation>HTML kann nicht eingefügt werden – es ist entweder ungültig oder wird nicht unterstützt</translation>
+    </message>
 </context>
 <context>
     <name>Timeline</name>
@@ -939,6 +947,13 @@ Matrix URI oder matrix.to Link</translation>
         <source>Show a confirmation box before opening non-Matrix links in an external application</source>
         <translation>Zeige ein Bestätigungsfeld vor dem Öffnen von Nicht-Matrix-Links in einer externen Anwendung an</translation>
     </message>
+    <message numerus="yes">
+        <source>Loading %Ln accounts, please wait</source>
+        <translation>
+            <numerusform>%Ln Konto wird geladen, bitte warten</numerusform>
+            <numerusform>%Ln Konten werden geladen, bitte warten</numerusform>
+        </translation>
+    </message>
     <message>
         <source>Account %1 is synchronised, have a good chat</source>
         <translation>Konto %1 ist synchronisiert, viel Spaß beim Chatten</translation>
@@ -1222,6 +1237,10 @@ Matrix URI oder matrix.to Link</translation>
         <source>You are using an UNSTABLE room version (%1). The server may stop supporting it at any moment. Do you still want to use this version?</source>
         <translation>Sie verwenden eine INSTABILE Raumversion (%1). Der Server kann die Unterstützung jederzeit einstellen. Möchten Sie diese Version noch verwenden?</translation>
     </message>
+    <message>
+        <source>(no available room versions)</source>
+        <translation>(keine verfügbaren Raumversionen)</translation>
+    </message>
 </context>
 <context>
     <name>RoomListDock</name>
@@ -1354,6 +1373,14 @@ Matrix URI oder matrix.to Link</translation>
     <message>
         <source>Events after fully read marker: %L1</source>
         <translation>Ereignisse nach vollständig gelesenem Marker: %L1</translation>
+    </message>
+    <message>
+        <source>Unread events/highlights since read receipt: %L1/%L2</source>
+        <translation>Ungelesene Ereignisse/Hervorhebungen nach vollständig gelesenem Marker: %L1/%L2</translation>
+    </message>
+    <message>
+        <source>Unread events since read receipt: %L1</source>
+        <translation>Ungelesene Ereignisse nach vollständig gelesenem Marker: %L1</translation>
     </message>
     <message>
         <source>Room id: %1</source>
