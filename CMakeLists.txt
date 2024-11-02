@@ -3,7 +3,7 @@ if (POLICY CMP0092)
 cmake_policy(SET CMP0092 NEW)
 endif()
 
-set(IDENTIFIER "com.github.quaternion")
+set(IDENTIFIER "io.github.quotient_im.Quaternion")
 set(COPYRIGHT "Copyright © 2015-2024 The Quaternion contributors")
 
 project(quaternion VERSION 0.0.96.1 LANGUAGES CXX)

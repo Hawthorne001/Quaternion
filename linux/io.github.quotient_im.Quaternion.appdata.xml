@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component type="desktop-application">
-  <id>com.github.quaternion.desktop</id>
+  <id>io.github.quotient_im.Quaternion</id>
   <metadata_license>CC-BY-4.0</metadata_license>
   <project_license>GPL-3.0+</project_license>
   <name>Quaternion</name>
@@ -19,11 +19,12 @@
     <category>Network</category>
   </categories>
 
-  <launchable type="desktop-id">com.github.quaternion.desktop</launchable>
+  <launchable type="desktop-id">io.github.quotient_im.Quaternion.desktop</launchable>
 
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/quotient-im/Quaternion/master/Screenshot1.png</image>
+      <caption>UI screenshot</caption>
     </screenshot>
   </screenshots>
 
@@ -33,7 +34,12 @@
 
   <provides>
     <binary>quaternion</binary>
+    <id>com.github.quaternion.desktop</id>
   </provides>
+
+  <replaces>
+    <id>com.github.quaternion.desktop</id>
+  </replaces>
 
   <releases>
     <release version="0.0.96.1" date="2024-02-19">
