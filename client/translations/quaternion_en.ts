@@ -2235,22 +2235,22 @@ new room</translation>
 <context>
     <name>main</name>
     <message>
-        <location filename="../main.cpp" line="118"/>
+        <location filename="../main.cpp" line="122"/>
         <source>Quaternion - an IM client for the Matrix protocol</source>
         <translation>Quaternion - an IM client for the Matrix protocol</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="125"/>
+        <location filename="../main.cpp" line="129"/>
         <source>Override locale</source>
         <translation>Override locale</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="126"/>
+        <location filename="../main.cpp" line="130"/>
         <source>locale</source>
         <translation>locale</translation>
     </message>
     <message>
-        <location filename="../main.cpp" line="129"/>
+        <location filename="../main.cpp" line="133"/>
         <source>Hide main window on startup</source>
         <translation>Hide main window on startup</translation>
     </message>
