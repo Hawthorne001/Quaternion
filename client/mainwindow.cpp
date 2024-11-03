@@ -8,56 +8,56 @@
 
 #include "mainwindow.h"
 
-#include "roomlistdock.h"
-#include "userlistdock.h"
-#include "dockmodemenu.h"
+#include "accountselector.h"
 #include "chatroomwidget.h"
-#include "timelinewidget.h"
-#include "quaternionroom.h"
-#include "profiledialog.h"
+#include "dockmodemenu.h"
+#include "linuxutils.h"
+#include "logging_categories.h"
 #include "logindialog.h"
 #include "networkconfigdialog.h"
+#include "profiledialog.h"
+#include "quaternionroom.h"
 #include "roomdialogs.h"
-#include "accountselector.h"
+#include "roomlistdock.h"
 #include "systemtrayicon.h"
-#include "logging_categories.h"
-#include "linuxutils.h"
+#include "timelinewidget.h"
+#include "userlistdock.h"
 
 #include <Quotient/csapi/joining.h>
+
 #include <Quotient/connection.h>
 #include <Quotient/networkaccessmanager.h>
+#include <Quotient/qt_connection_util.h>
 #include <Quotient/settings.h>
 #include <Quotient/user.h>
-#include <Quotient/qt_connection_util.h>
 
-#include <QtCore/QTimer>
-#include <QtCore/QDebug>
-#include <QtCore/QStandardPaths>
-#include <QtCore/QStringBuilder>
-#include <QtCore/QFileInfo>
-#include <QtCore/QDir>
-#include <QtCore/QElapsedTimer>
-#include <QtNetwork/QNetworkReply>
-#include <QtNetwork/QAuthenticator>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QCheckBox>
+#include <QtWidgets/QComboBox>
+#include <QtWidgets/QCompleter>
+#include <QtWidgets/QDialogButtonBox>
+#include <QtWidgets/QFormLayout>
+#include <QtWidgets/QInputDialog>
+#include <QtWidgets/QLabel>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QMessageBox>
-#include <QtWidgets/QInputDialog>
-#include <QtWidgets/QStatusBar>
-#include <QtWidgets/QLabel>
 #include <QtWidgets/QPushButton>
-#include <QtWidgets/QDialogButtonBox>
-#include <QtWidgets/QComboBox>
-#include <QtWidgets/QCheckBox>
-#include <QtWidgets/QFormLayout>
-#include <QtWidgets/QCompleter>
-#if QT_VERSION_MAJOR >= 6
+#include <QtWidgets/QStatusBar>
+
+#include <QtCore/QDebug>
+#include <QtCore/QDir>
+#include <QtCore/QElapsedTimer>
+#include <QtCore/QFileInfo>
+#include <QtCore/QStandardPaths>
+#include <QtCore/QStringBuilder>
+#include <QtCore/QTimer>
 #include <QtGui/QActionGroup>
-#endif
-#include <QtGui/QMovie>
-#include <QtGui/QPixmap>
 #include <QtGui/QCloseEvent>
 #include <QtGui/QDesktopServices>
+#include <QtGui/QMovie>
+#include <QtGui/QPixmap>
+#include <QtNetwork/QAuthenticator>
+#include <QtNetwork/QNetworkReply>
 
 MainWindow::MainWindow()
 {
@@ -74,7 +74,7 @@ MainWindow::MainWindow()
     connect(nam, &QNetworkAccessManager::sslErrors,
             this, &MainWindow::sslErrors);
 
-    setWindowIcon(QIcon::fromTheme(appIconName(), QIcon(":/icon.png")));
+    setWindowIcon(appIcon());
 
     roomListDock = new RoomListDock(this);
     addDockWidget(Qt::LeftDockWidgetArea, roomListDock);

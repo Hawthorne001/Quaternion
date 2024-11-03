@@ -2,8 +2,6 @@
 
 #include "logging_categories.h"
 
-#include <Quotient/util.h>
-
 #include <QtGui/QTextDocument>
 #include <QtGui/QFontDatabase>
 

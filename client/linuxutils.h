@@ -8,11 +8,14 @@
 #pragma once
 
 #include <QtCore/QFileInfo>
+#include <QtGui/QIcon>
 
-inline bool inFlatpak() {
-    return QFileInfo::exists("/.flatpak-info");
-}
+const auto AppId = QStringLiteral("io.github.quotient_im.Quaternion");
 
-inline QString appIconName() {
-    return inFlatpak() ? "com.github.quaternion" : "quaternion";
+inline bool inFlatpak() { return QFileInfo::exists("/.flatpak-info"); }
+
+inline QIcon appIcon()
+{
+    using Qt::operator""_s;
+    return QIcon::fromTheme(inFlatpak() ? AppId : u"quaternion"_s, QIcon(u":/icon.png"_s));
 }

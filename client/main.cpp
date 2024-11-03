@@ -6,54 +6,69 @@
  *                                                                        *
  **************************************************************************/
 
-#include <QtWidgets/QApplication>
-#include <QtCore/QTranslator>
-#include <QtCore/QLibraryInfo>
-#include <QtCore/QCommandLineParser>
-#include <QtCore/QLoggingCategory>
-#include <QtCore/QStandardPaths>
-#include <QtWidgets/QStyleFactory>
-#include <QtQuickControls2/QQuickStyle>
-
-#include "mainwindow.h"
-#include "logging_categories.h"
 #include "linuxutils.h"
+#include "logging_categories.h"
+#include "mainwindow.h"
 
 #include <Quotient/networksettings.h>
 
-void loadTranslations(
-        std::initializer_list<std::pair<QStringList, QString>> translationConfigs)
+#include <QtQuickControls2/QQuickStyle>
+#include <QtWidgets/QApplication>
+#include <QtWidgets/QStyleFactory>
+
+#include <QtCore/QCommandLineParser>
+#include <QtCore/QLibraryInfo>
+#include <QtCore/QStandardPaths>
+#include <QtCore/QTranslator>
+
+using namespace Qt::StringLiterals;
+
+namespace {
+inline void loadTranslations()
 {
-    for (const auto& [configNames, configPath]: translationConfigs)
-        for (const auto& configName: configNames) {
-            auto* translator = new QTranslator(qApp);
-            bool loaded = false;
+// Extract a number from another macro and turn it to a const char[]
+#define ITOA(i) #i
+    static const auto translationConfigs = std::to_array<std::pair<QStringList, QString>>(
+        { { { u"qt"_s, u"qtbase"_s, u"qtnetwork"_s, u"qtdeclarative"_s, u"qtmultimedia"_s,
+              u"qtquickcontrols"_s, u"qtquickcontrols2"_s,
+              // QtKeychain tries to install its translations to Qt's path;
+              // try to look there, just in case (see also below)
+              u"qtkeychain"_s },
+            QLibraryInfo::path(QLibraryInfo::TranslationsPath) },
+          { { u"qtkeychain"_s },
+            QStandardPaths::locate(QStandardPaths::GenericDataLocation,
+                                   u"qt" ITOA(QT_VERSION_MAJOR) "keychain/translations"_s,
+                                   QStandardPaths::LocateDirectory) },
+          { { u"qt"_s, u"qtkeychain"_s, u"quotient"_s, u"quaternion"_s },
+            QStandardPaths::locate(QStandardPaths::AppLocalDataLocation, u"translations"_s,
+                                   QStandardPaths::LocateDirectory) } });
+#undef ITOA
+
+    for (const auto& [configNames, configPath] : translationConfigs)
+        for (const auto& configName : configNames) {
+            auto translator = std::make_unique<QTranslator>();
             // Check the current directory then configPath
-            if (translator->load(QLocale(), configName, "_")
-                || translator->load(QLocale(), configName, "_", configPath)) {
+            if (translator->load(QLocale(), configName, u"_"_s)
+                || translator->load(QLocale(), configName, u"_"_s, configPath)) {
                 auto path = translator->filePath();
-                if ((loaded = QApplication::installTranslator(translator)))
-                    qCDebug(MAIN).noquote()
-                        << "Loaded translations from" << path;
-                else
-                    qCWarning(MAIN).noquote()
-                        << "Failed to load translations from" << path;
+                if (QApplication::installTranslator(translator.get())) {
+                    qCDebug(MAIN).noquote() << "Loaded translations from" << path;
+                    translator.release()->setParent(qApp); // Change pointer ownership
+                } else
+                    qCWarning(MAIN).noquote() << "Failed to load translations from" << path;
             } else
-                qCDebug(MAIN) << "No translations for" << configName << "at"
-                              << configPath;
-            if (!loaded)
-                delete translator;
+                qCDebug(MAIN) << "No translations for" << configName << "at" << configPath;
         }
+}
 }
 
 int main( int argc, char* argv[] )
 {
-    using namespace Qt::StringLiterals;
     QApplication::setOrganizationName(u"Quotient"_s);
     QApplication::setApplicationName(u"quaternion"_s);
     QApplication::setApplicationDisplayName(u"Quaternion"_s);
     QApplication::setApplicationVersion(u"0.0.96.91"_s);
-    QApplication::setDesktopFileName(u"io.github.quotient_im.Quaternion"_s);
+    QApplication::setDesktopFileName(AppId);
 
     using Quotient::Settings;
     Settings::setLegacyNames(u"QMatrixClient"_s, u"quaternion"_s);
@@ -131,24 +146,7 @@ int main( int argc, char* argv[] )
         qCInfo(MAIN) << "Using locale" << QLocale().name();
     }
 
-// Extract a number from another macro and turn it to a const char[]
-#define ITOA(i) #i
-
-    loadTranslations({ { { "qt", "qtbase", "qtnetwork", "qtdeclarative", "qtmultimedia",
-                           "qtquickcontrols", "qtquickcontrols2",
-                           // QtKeychain tries to install its translations to Qt's path;
-                           // try to look there, just in case (see also below)
-                           "qtkeychain" },
-                         QLibraryInfo::path(QLibraryInfo::TranslationsPath) },
-                       { { "qtkeychain" },
-                         QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                                                "qt" ITOA(QT_VERSION_MAJOR) "keychain/translations",
-                                                QStandardPaths::LocateDirectory) },
-                       { { "qt", "qtkeychain", "quotient", "quaternion" },
-                         QStandardPaths::locate(QStandardPaths::AppLocalDataLocation, "translations",
-                                                QStandardPaths::LocateDirectory) } });
-
-#undef ITOA
+    loadTranslations();
 
     Quotient::NetworkSettings().setupApplicationProxy();
 
