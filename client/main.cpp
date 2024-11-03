@@ -48,22 +48,15 @@ void loadTranslations(
 
 int main( int argc, char* argv[] )
 {
-#if QT_VERSION_MAJOR < 6
-    QApplication::setAttribute(Qt::AA_DisableWindowContextHelpButton);
-#if defined(Q_OS_LINUX)
-    QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-#endif
-#endif
-
-    QApplication::setOrganizationName(QStringLiteral("Quotient"));
-    QApplication::setApplicationName(QStringLiteral("quaternion"));
-    QApplication::setApplicationDisplayName(QStringLiteral("Quaternion"));
-    QApplication::setApplicationVersion(QStringLiteral("0.0.96.1 (+git)"));
-    QApplication::setDesktopFileName(QStringLiteral("com.github.quaternion"));
+    using namespace Qt::StringLiterals;
+    QApplication::setOrganizationName(u"Quotient"_s);
+    QApplication::setApplicationName(u"quaternion"_s);
+    QApplication::setApplicationDisplayName(u"Quaternion"_s);
+    QApplication::setApplicationVersion(u"0.0.96.91"_s);
+    QApplication::setDesktopFileName(u"io.github.quotient_im.Quaternion"_s);
 
     using Quotient::Settings;
-    Settings::setLegacyNames(QStringLiteral("QMatrixClient"),
-                             QStringLiteral("quaternion"));
+    Settings::setLegacyNames(u"QMatrixClient"_s, u"quaternion"_s);
     Settings settings;
 
     QApplication app(argc, argv);
@@ -83,11 +76,7 @@ int main( int argc, char* argv[] )
     } else
 #endif
     {
-#if QT_VERSION_MAJOR < 6
-        const auto qqc2styles = QQuickStyle::availableStyles();
-        if (qqc2styles.contains("Fusion"))
-#endif
-            QQuickStyle::setFallbackStyle("Fusion"); // Looks better on desktops
+        QQuickStyle::setFallbackStyle(u"Fusion"_s); // Looks better on desktops
 //        QQuickStyle::setStyle("Material");
     }
 
