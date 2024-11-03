@@ -42,6 +42,12 @@
   </replaces>
 
   <releases>
+    <release version="0.0.96.81" type="development" date="2024-11-03">
+      <url>https://github.com/quotient-im/Quaternion/releases/tag/0.0.97-beta1</url>
+      <description><p>0.0.97 beta</p>
+        <p>Port Quaternion to libQuotient 0.9</p>
+      </description>
+    </release>
     <release version="0.0.96.1" date="2024-02-19">
       <url>https://github.com/quotient-im/Quaternion/releases/tag/0.0.96.1</url>
       <description><p>Changes since 0.0.96:</p>

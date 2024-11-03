@@ -67,7 +67,7 @@ int main( int argc, char* argv[] )
     QApplication::setOrganizationName(u"Quotient"_s);
     QApplication::setApplicationName(u"quaternion"_s);
     QApplication::setApplicationDisplayName(u"Quaternion"_s);
-    QApplication::setApplicationVersion(u"0.0.96.91"_s);
+    QApplication::setApplicationVersion(u"0.0.97 beta"_s);
     QApplication::setDesktopFileName(AppId);
 
     using Quotient::Settings;
