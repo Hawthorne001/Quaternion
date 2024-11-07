@@ -10,12 +10,13 @@
 #include <QtCore/QFileInfo>
 #include <QtGui/QIcon>
 
-const auto AppId = QStringLiteral("io.github.quotient_im.Quaternion");
+inline const auto AppName = QStringLiteral("quaternion");
+inline const auto AppId = QStringLiteral("io.github.quotient_im.Quaternion");
 
 inline bool inFlatpak() { return QFileInfo::exists("/.flatpak-info"); }
 
 inline QIcon appIcon()
 {
     using Qt::operator""_s;
-    return QIcon::fromTheme(inFlatpak() ? AppId : u"quaternion"_s, QIcon(u":/icon.png"_s));
+    return QIcon::fromTheme(inFlatpak() ? AppId : AppName, QIcon(u":/icon.png"_s));
 }

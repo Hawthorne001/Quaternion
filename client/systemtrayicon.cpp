@@ -15,7 +15,7 @@
 
 #include "mainwindow.h"
 #include "quaternionroom.h"
-#include "linuxutils.h"
+#include "desktop_integration.h"
 
 #include <Quotient/settings.h>
 #include <Quotient/qt_connection_util.h>

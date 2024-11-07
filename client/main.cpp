@@ -6,7 +6,7 @@
  *                                                                        *
  **************************************************************************/
 
-#include "linuxutils.h"
+#include "desktop_integration.h"
 #include "logging_categories.h"
 #include "mainwindow.h"
 
@@ -39,7 +39,7 @@ inline void loadTranslations()
             QStandardPaths::locate(QStandardPaths::GenericDataLocation,
                                    u"qt" ITOA(QT_VERSION_MAJOR) "keychain/translations"_s,
                                    QStandardPaths::LocateDirectory) },
-          { { u"qt"_s, u"qtkeychain"_s, u"quotient"_s, u"quaternion"_s },
+          { { u"qt"_s, u"qtkeychain"_s, u"quotient"_s, AppName },
             QStandardPaths::locate(QStandardPaths::AppLocalDataLocation, u"translations"_s,
                                    QStandardPaths::LocateDirectory) } });
 #undef ITOA
@@ -65,7 +65,7 @@ inline void loadTranslations()
 int main( int argc, char* argv[] )
 {
     QApplication::setOrganizationName(u"Quotient"_s);
-    QApplication::setApplicationName(u"quaternion"_s);
+    QApplication::setApplicationName(AppName);
     QApplication::setApplicationDisplayName(u"Quaternion"_s);
     QApplication::setApplicationVersion(u"0.0.97 beta (+git)"_s);
     QApplication::setDesktopFileName(AppId);
