@@ -142,35 +142,39 @@ else ()
 endif ()
 message(STATUS)
 
+# Windows, this is a GUI executable; OSX, make a bundle
+add_executable(${PROJECT_NAME} WIN32 MACOSX_BUNDLE)
+
 # Set up source files
-set(quaternion_SRCS
-    client/quaternionroom.cpp
-    client/htmlfilter.cpp
-    client/thumbnailprovider.cpp
-    client/activitydetector.cpp
-    client/dialog.cpp
-    client/logindialog.cpp
-    client/networkconfigdialog.cpp
-    client/roomdialogs.cpp
-    client/dockmodemenu.cpp
-    client/mainwindow.cpp
-    client/roomlistdock.cpp
-    client/userlistdock.cpp
-    client/accountselector.cpp
-    client/kchatedit.cpp
-    client/chatedit.cpp
-    client/timelinewidget.cpp
-    client/chatroomwidget.cpp
-    client/systemtrayicon.cpp
-    client/profiledialog.cpp
-    client/models/messageeventmodel.cpp
-    client/models/userlistmodel.cpp
-    client/models/roomlistmodel.cpp
-    client/models/abstractroomordering.cpp
-    client/models/orderbytag.cpp
+target_sources(${PROJECT_NAME} PRIVATE
+    client/quaternionroom.cpp client/quaternionroom.h
+    client/htmlfilter.cpp client/htmlfilter.h
+    client/thumbnailprovider.cpp client/thumbnailprovider.h
+    client/activitydetector.cpp client/activitydetector.h
+    client/dialog.cpp client/dialog.h
+    client/logindialog.cpp client/logindialog.h
+    client/networkconfigdialog.cpp client/networkconfigdialog.h
+    client/roomdialogs.cpp client/roomdialogs.h
+    client/dockmodemenu.cpp client/dockmodemenu.h
+    client/mainwindow.cpp client/mainwindow.h
+    client/roomlistdock.cpp client/roomlistdock.h
+    client/userlistdock.cpp client/userlistdock.h
+    client/accountselector.cpp client/accountselector.h
+    client/kchatedit.cpp client/kchatedit.h
+    client/chatedit.cpp client/chatedit.h
+    client/timelinewidget.cpp client/timelinewidget.h
+    client/chatroomwidget.cpp client/chatroomwidget.h
+    client/systemtrayicon.cpp client/systemtrayicon.h
+    client/profiledialog.cpp client/profiledialog.h
+    client/models/messageeventmodel.cpp client/models/messageeventmodel.h
+    client/models/userlistmodel.cpp client/models/userlistmodel.h
+    client/models/roomlistmodel.cpp client/models/roomlistmodel.h
+    client/models/abstractroomordering.cpp client/models/abstractroomordering.h
+    client/models/orderbytag.cpp client/models/orderbytag.h
+    client/desktop_integration.h client/logging_categories.h
     client/main.cpp
     client/resources.qrc
-    )
+)
 
 # quaternion_en.ts is updated explicitly by building trbase target,
 # while all other translation files are created and updated externally at
@@ -180,20 +184,21 @@ QT_CREATE_TRANSLATION(quaternion_QM ${quaternion_en_TS}
                       client/ client/qml/ OPTIONS -no-obsolete)
 add_custom_target(trbase DEPENDS ${quaternion_en_TS})
 
-set(quaternion_TS
+QT_ADD_TRANSLATION(quaternion_QM
     client/translations/quaternion_en_GB.ts
     client/translations/quaternion_de.ts
     client/translations/quaternion_pl.ts
     client/translations/quaternion_ru.ts
     client/translations/quaternion_es.ts
-    )
-QT_ADD_TRANSLATION(quaternion_QM ${quaternion_TS})
+)
+target_sources(${PROJECT_NAME} PRIVATE ${quaternion_QM})
 
 if(WIN32)
     set(quaternion_WINRC quaternion_win32.rc)
-    set_property(SOURCE quaternion_win32.rc APPEND PROPERTY
+    set_property(SOURCE ${quaternion_WINRC} APPEND PROPERTY
         OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/icons/quaternion.ico
     )
+    target_sources(${PROJECT_NAME} PRIVATE ${quaternion_WINRC})
 endif()
 
 if(APPLE)
@@ -212,12 +217,8 @@ if(APPLE)
     set(MACOSX_BUNDLE_ICON_FILE ${ICON_NAME})
     set_property(SOURCE "${${PROJECT_NAME}_MAC_ICON}" PROPERTY
         MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(${PROJECT_NAME} PRIVATE ${${PROJECT_NAME}_MAC_ICON})
 endif(APPLE)
-
-# Windows, this is a GUI executable; OSX, make a bundle
-add_executable(${PROJECT_NAME} WIN32 MACOSX_BUNDLE
-    ${quaternion_SRCS} ${quaternion_QM}
-    ${quaternion_WINRC} ${${PROJECT_NAME}_MAC_ICON})
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 
