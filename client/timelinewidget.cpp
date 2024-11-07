@@ -26,6 +26,11 @@
 
 using Quotient::operator""_ls;
 
+QNetworkAccessManager* TimelineWidget::NamFactory::create(QObject* parent)
+{
+    return new Quotient::NetworkAccessManager(parent);
+}
+
 TimelineWidget::TimelineWidget(ChatRoomWidget* chatRoomWidget)
     : QQuickWidget(chatRoomWidget)
     , m_messageModel(new MessageEventModel(this))
@@ -45,6 +50,7 @@ TimelineWidget::TimelineWidget(ChatRoomWidget* chatRoomWidget)
     setResizeMode(SizeRootObjectToView);
 
     engine()->addImageProvider("thumbnail"_ls, makeThumbnailProvider(this));
+    engine()->setNetworkAccessManagerFactory(&namFactory);
 
     auto* ctxt = rootContext();
     ctxt->setContextProperty("messageModel"_ls, m_messageModel);

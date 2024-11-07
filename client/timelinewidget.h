@@ -4,7 +4,9 @@
 
 #include <Quotient/eventitem.h>
 
+#include <QtQml/QQmlNetworkAccessManagerFactory>
 #include <QtQuickWidgets/QQuickWidget>
+
 #include <QtCore/QBasicTimer>
 
 class ChatRoomWidget;
@@ -54,6 +56,12 @@ private:
     bool readMarkerOnScreen;
     ActivityDetector activityDetector;
     ChatRoomWidget* roomWidget;
+
+    class NamFactory : public QQmlNetworkAccessManagerFactory {
+    public:
+        QNetworkAccessManager* create(QObject* parent) override;
+    };
+    NamFactory namFactory;
 
     void reStartShownTimer();
     void timerEvent(QTimerEvent* qte) override;
