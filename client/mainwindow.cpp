@@ -11,7 +11,7 @@
 #include "accountselector.h"
 #include "chatroomwidget.h"
 #include "dockmodemenu.h"
-#include "linuxutils.h"
+#include "desktop_integration.h"
 #include "logging_categories.h"
 #include "logindialog.h"
 #include "networkconfigdialog.h"
