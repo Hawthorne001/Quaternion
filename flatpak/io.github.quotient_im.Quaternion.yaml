@@ -17,12 +17,12 @@ finish-args:
 - --talk-name=org.kde.StatusNotifierWatcher
 cleanup:
 - /include
-- /lib
 - /lib/pkgconfig
 - /share/man
 modules:
 - name: libolm
   buildsystem: cmake-ninja
+  builddir: true
   sources:
   - type: git
     url: https://gitlab.matrix.org/matrix-org/olm.git
@@ -30,39 +30,51 @@ modules:
   config-opts:
   - -DBUILD_SHARED_LIBS=OFF
   cleanup:
+  - /lib
   - /share
 
 - name: libsecret
   buildsystem: meson
+  builddir: true
   config-opts:
   - -Dmanpage=false
   - -Dvapi=false
   - -Dgtk_doc=false
   - -Dintrospection=false
-  - -Dprefer_static=true
+  - -Dcrypto=disabled
   cleanup:
   - /bin
   sources:
   - type: git
     url: https://gitlab.gnome.org/GNOME/libsecret.git
-    tag: '0.20.5'
+    tag: '0.21.4'
 
 - name: qtkeychain
   buildsystem: cmake-ninja
+  builddir: true
   sources:
   - type: git
     url: https://github.com/frankosterfeld/qtkeychain.git
     tag: '0.14.3'
+  cleanup:
+  - mkspecs
+  - /lib/cmake
   config-opts:
   - -DBUILD_WITH_QT6=ON
-  - -DBUILD_SHARED_LIBS=OFF
+  # When linked statically, Qt Keychain fails to work with all kinds of strange DBus errors
+#  - -DBUILD_SHARED_LIBS=OFF
+  - -DCMAKE_INSTALL_LIBDIR=/app/lib
+  - -DLIB_INSTALL_DIR=/app/lib
   - -DBUILD_TEST_APPLICATION=OFF
 
 - name: quaternion
   buildsystem: cmake-ninja
+  builddir: true
   sources:
   - type: dir
     path: "../"
   config-opts:
-  - -DQuotient_INSTALL_TESTS=OFF
+  - -DBUILD_TESTING=OFF
   - -DBUILD_SHARED_LIBS=OFF
+  cleanup:
+  - /lib
