@@ -261,17 +261,10 @@ int MessageEventModel::findRow(const QString& id, bool includePending) const
 namespace {
 inline std::optional<QDateTime> getTimestamp(auto from, auto to)
 {
-    if (auto it = std::find_if(from, to,
-                               [](const Quotient::TimelineItem& ti) {
-                                   return ti->originTimestamp().isValid();
-                               });
-        it != to)
-        return QDateTime(it->event()->originTimestamp().date(), { 0, 0 }
-#if QT_VERSION < QT_VERSION_CHECK(6, 5, 0)
-                         ,
-                         Qt::LocalTime
-#endif
-        );
+    for (const auto& ti : std::ranges::subrange(from, to))
+        if (auto ts = ti->originTimestamp(); ts.isValid())
+            return ts.date().startOfDay();
+
     return std::nullopt;
 }
 }
