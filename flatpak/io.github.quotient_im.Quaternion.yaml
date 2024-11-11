@@ -29,6 +29,7 @@ modules:
     tag:  '3.2.15'
   config-opts:
   - -DBUILD_SHARED_LIBS=OFF
+  - -DOLM_TESTS=OFF
   cleanup:
   - /lib
   - /share
@@ -78,3 +79,4 @@ modules:
   - -DBUILD_SHARED_LIBS=OFF
   cleanup:
   - /lib
+  - /share/ndk-modules
