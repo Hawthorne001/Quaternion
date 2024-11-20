@@ -268,10 +268,10 @@ static const auto mxBgColorAttr = u"data-mx-bg-color";
                && m.capturedEnd(1) < gtPos) {
             pos = m.capturedEnd();
             if (m.captured(2).isEmpty()) {
-                static const auto attrValue = QString("=''");
+                static const auto attrValue = u"=''"_s;
                 html.insert(m.capturedEnd(1), attrValue);
-                gtPos += attrValue.size() - 1;
-                pos += attrValue.size() - 1;
+                gtPos += attrValue.size();
+                pos += attrValue.size();
             }
         }
         // Make sure empty elements are properly closed
