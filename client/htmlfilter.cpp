@@ -16,6 +16,7 @@
 #include <stack>
 
 using namespace std;
+using namespace Qt::StringLiterals;
 
 namespace HtmlFilter {
 
