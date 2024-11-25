@@ -418,7 +418,7 @@ Item {
                             : progressInfo.failed
                               ? ""
                               : content?.info.thumbnail_info && !autoload
-                                ? "image://thumbnail/" + content.thumbnailMediaId
+                                ? room.makeMediaUrl(eventId, content.info.thumbnail_url)
                                 : ""
                     maxHeight: chatView.height - textField.height -
                                authorLabel.height * !settings.timelineStyleIsXChat

@@ -49,7 +49,6 @@ TimelineWidget::TimelineWidget(ChatRoomWidget* chatRoomWidget)
 
     setResizeMode(SizeRootObjectToView);
 
-    engine()->addImageProvider("thumbnail"_ls, makeThumbnailProvider(this));
     engine()->setNetworkAccessManagerFactory(&namFactory);
 
     auto* ctxt = rootContext();
