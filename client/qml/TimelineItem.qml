@@ -408,16 +408,17 @@ Item {
                 anchors.right: textField.right
 
                 sourceComponent: ImageContent {
-                    property var info: !progressInfo.isUpload && !progressInfo.active
-                                       ? content?.info?.thumbnail_info : content.info
-                    sourceSize: if (info) { Qt.size(info.w, info.h) }
+                    property var info: progressInfo.isUpload || autoload || progressInfo.active
+                                       ? content?.info : content?.info?.thumbnail_info
+                    sourceSize: if (info && info.w && info.h) { Qt.size(info.w, info.h) }
                     source: downloaded || progressInfo.isUpload
                             ? progressInfo.localPath
-                            : progressInfo.failed
-                              ? ""
-                              : content?.info.thumbnail_info && !autoload
-                                ? room.makeMediaUrl(eventId, content.info.thumbnail_url)
-                                : ""
+                            : !progressInfo.failed
+                              ? autoload ? room.makeMediaUrl(eventId, content.url)
+                                         : content.info.thumbnail_url
+                                           ? room.makeMediaUrl(eventId, content.info.thumbnail_url)
+                                           : ""
+                              : "" // TODO: show thumbnail or failing that blurhash before loading
                     maxHeight: chatView.height - textField.height -
                                authorLabel.height * !settings.timelineStyleIsXChat
                     autoload: settings.autoload_images
