@@ -3,7 +3,6 @@
 #include "chatroomwidget.h"
 #include "logging_categories.h"
 #include "models/messageeventmodel.h"
-#include "thumbnailprovider.h"
 
 #include <Quotient/events/reactionevent.h>
 #include <Quotient/events/roompowerlevelsevent.h>
