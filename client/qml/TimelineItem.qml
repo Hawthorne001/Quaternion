@@ -319,11 +319,9 @@ Item {
                     textFormat: TextEdit.RichText
                     // FIXME: The text is clumsy and slows down creation
                     text: (!settings.timelineStyleIsXChat
-                           ? ("<table style='
-                                float: right; font-size: small;
-                                color:\"" + settings.lowlight_color
-                              + "\"'><tr><td>"
-                              + (time ? toHtmlEscaped(time) : "")
+                           ? ("<table style='float: right; font-size: small; color:\""
+                                + settings.lowlight_color
+                              + "\"'><tr><td>" + (time ? toHtmlEscaped(time) : "")
                               + "</td></tr></table>"
                               + (actionEvent && !authorLabel.visible
                                  ? ("<a href='" + (author?.id ?? "")

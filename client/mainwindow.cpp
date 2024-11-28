@@ -644,11 +644,9 @@ void MainWindow::firstSyncOver(const Connection *c)
     statusBar()->showMessage(
         tr("First sync completed for %1", "%1 is user id").arg(c->userId()),
         3000);
-    const auto& accountsNotSynced =
-        std::count_if(accountRegistry->cbegin(), accountRegistry->cend(),
-                      [](const Connection* cc) {
-                          return cc->nextBatchToken().isEmpty();
-                      });
+    const auto accountsNotSynced =
+        std::ranges::count_if(*accountRegistry,
+                              [](const Connection* cc) { return cc->nextBatchToken().isEmpty(); });
     qCDebug(MAIN) << "Connections still not synced: " << accountsNotSynced;
     if (accountsNotSynced == 0) {
         busyLabel->hide();

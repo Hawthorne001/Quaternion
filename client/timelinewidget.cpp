@@ -92,9 +92,7 @@ void TimelineWidget::setRoom(QuaternionRoom* newRoom)
         connect(newRoom, &Quotient::Room::fullyReadMarkerMoved, this, [this] {
             const auto rm = currentRoom()->fullyReadMarker();
             readMarkerOnScreen = rm != currentRoom()->historyEdge()
-                                 && std::lower_bound(indicesOnScreen.cbegin(),
-                                                     indicesOnScreen.cend(),
-                                                     rm->index())
+                                 && std::ranges::lower_bound(indicesOnScreen, rm->index())
                                         != indicesOnScreen.cend();
             reStartShownTimer();
             activityDetector.setEnabled(pendingMarkRead());
@@ -157,8 +155,7 @@ void TimelineWidget::onMessageShownChanged(int visualIndex, bool shown,
             maybeReadTimer.stop();
     }
 
-    auto pos = std::lower_bound(indicesOnScreen.begin(), indicesOnScreen.end(),
-                                timelineIndex);
+    const auto pos = std::ranges::lower_bound(indicesOnScreen, timelineIndex);
     if (shown) {
         if (pos == indicesOnScreen.end() || *pos != timelineIndex) {
             indicesOnScreen.insert(pos, timelineIndex);

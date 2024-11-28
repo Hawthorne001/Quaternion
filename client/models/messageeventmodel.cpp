@@ -866,10 +866,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
             m_currentRoom->relatedEvents(evt, EventRelation::AnnotationType);
         for (const auto& a: annotations)
             if (const auto *const e = eventCast<const ReactionEvent>(a)) {
-                auto rIt = std::find_if(reactions.begin(), reactions.end(),
-                                        [&e] (const Reaction& r) {
-                                            return r.key == e->key();
-                                       });
+                auto rIt = std::ranges::find(reactions, e->key(), &Reaction::key);
                 if (rIt == reactions.end())
                     rIt = reactions.insert(reactions.end(), { e->key() });
 

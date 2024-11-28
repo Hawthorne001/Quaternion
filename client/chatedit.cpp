@@ -145,7 +145,7 @@ bool ChatEdit::acceptMimeData(const QMimeData* source)
     } else if (source->hasUrls()) {
         const auto& urls = source->urls();
         // Only the first local url is processed for now
-        if (auto urlIt = std::ranges::find(urls, true, &QUrl::isLocalFile); urlIt != urls.cend())
+        if (const auto urlIt = std::ranges::find_if(urls, &QUrl::isLocalFile); urlIt != urls.cend())
             chatRoomWidget->dropFile(urlIt->toLocalFile());
         else
             KChatEdit::insertFromMimeData(source);

@@ -172,7 +172,7 @@ void UserListModel::filter(const QString& filterString)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
     m_memberIds.assign(sortedIds.begin(), sortedIds.end());
 #else
-    std::exchange(m_memberIds, QList(sortedIds.begin(), sortedIds.end()));
+    m_memberIds = QList(sortedIds.begin(), sortedIds.end());
 #endif
     endResetModel();
 

@@ -89,13 +89,13 @@ bool QuaternionRoom::canRedact(const Quotient::EventId& eventId) const
 void QuaternionRoom::onAddNewTimelineEvents(timeline_iter_t from)
 {
     std::for_each(from, messageEvents().cend(),
-                  [this](const TimelineItem& ti) { checkForHighlights(ti); });
+                  std::bind_front(&QuaternionRoom::checkForHighlights, this));
 }
 
 void QuaternionRoom::onAddHistoricalTimelineEvents(rev_iter_t from)
 {
     std::for_each(from, messageEvents().crend(),
-                  [this](const TimelineItem& ti) { checkForHighlights(ti); });
+                  std::bind_front(&QuaternionRoom::checkForHighlights, this));
 }
 
 void QuaternionRoom::checkForHighlights(const Quotient::TimelineItem& ti)

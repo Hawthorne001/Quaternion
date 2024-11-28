@@ -51,8 +51,7 @@ public:
     {
         return other.type() != UserType
                    ? QTableWidgetItem::operator<(other)
-                   : data(Qt::UserRole).value<QDateTime>()
-                         < other.data(Qt::UserRole).value<QDateTime>();
+                   : data(Qt::UserRole).toDateTime() < other.data(Qt::UserRole).toDateTime();
     }
 };
 

@@ -191,8 +191,13 @@ void LoginDialog::setup(const QString& statusMessage)
             &QLineEdit::clear);
 
     m_connection->enableEncryption(enableEncryption->isChecked());
-    connect(enableEncryption, &QCheckBox::stateChanged, m_connection.get(),
-            &Connection::enableEncryption);
+    connect(enableEncryption,
+#if QT_VERSION < QT_VERSION_CHECK(6, 7, 0)
+            &QCheckBox::stateChanged,
+#else
+            &QCheckBox::checkStateChanged,
+#endif
+            m_connection.get(), &Connection::enableEncryption);
     connect(m_connection.get(), &Connection::connected,
             this, &Dialog::accept);
     connect(m_connection.get(), &Connection::loginError,

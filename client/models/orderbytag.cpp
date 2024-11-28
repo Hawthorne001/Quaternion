@@ -97,9 +97,9 @@ QVariant OrderByTag::groupLabel(const RoomGroup& g) const
     return RoomListModel::tr("%1 (%Ln room(s))", "", g.rooms.size()).arg(caption);
 }
 
-bool OrderByTag::groupLessThan(const RoomGroup& g1, const QVariant& g2key) const
+bool OrderByTag::groupLessThan(const QVariant& g1key, const QVariant& g2key) const
 {
-    const auto& lkey = g1.key.toString();
+    const auto& lkey = g1key.toString();
     const auto& rkey = g2key.toString();
     // See above
     auto li = findIndexWithWildcards(tagsOrder, lkey);
@@ -183,7 +183,7 @@ AbstractRoomOrdering::groups_t OrderByTag::roomGroups(const Room* room) const
             return {}; // No remaining groups, hide the room
     }
     groups_t vl; vl.reserve(tags.size());
-    std::copy(tags.cbegin(), tags.cend(), std::back_inserter(vl));
+    std::ranges::copy(tags, std::back_inserter(vl));
     return vl;
 }
 
