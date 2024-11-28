@@ -714,17 +714,22 @@ Processor::rewrite_t Processor::filterTag(QStringView tag,
                 addColorAttr(mxColorAttr, aValue); // Add to 'color'
         }
 
+        // Enrich mxc source URLs for images with the context so that NAM could resolve them
+        if (tag == u"img" && aName == u"src" && aValue.startsWith(u"mxc:"))
+            rewrite.front().second.push_back(
+                mode == MatrixToQt
+                    ? QXmlStreamAttribute(
+                          aName.toString(),
+                          context->makeMediaUrl({}, QUrl::fromUserInput(aValue.toString()))
+                              .toString(QUrl::FullyEncoded))
+                    : std::move(a));
+
         // Generic filtering for attributes
-        if ((mode == GenericToQt
-             && (aName == htmlStyleAttr || aName == u"class" || aName == u"id"))
+        if ((mode == GenericToQt && (aName == htmlStyleAttr || aName == u"class" || aName == u"id"))
             || (tag == u"a" && aName == u"href"
-                && any_of(begin(permittedSchemes), end(permittedSchemes),
-                          [&aValue](QStringView s) {
-                              return aValue.startsWith(s);
-                          }))
-            || (tag == u"img" && aName == u"src" && aValue.startsWith(u"mxc:"))
-            || find(passList.begin(), passList.end(), a.qualifiedName())
-                   != passList.end())
+                && ranges::any_of(permittedSchemes,
+                                  [&aValue](QStringView s) { return aValue.startsWith(s); }))
+            || ranges::contains(passList, a.qualifiedName()))
             rewrite.front().second.push_back(std::move(a));
     } // for (a: attributes)
 
