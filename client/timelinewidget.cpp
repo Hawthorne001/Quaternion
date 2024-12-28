@@ -35,7 +35,6 @@ TimelineWidget::TimelineWidget(ChatRoomWidget* chatRoomWidget)
     , m_messageModel(new MessageEventModel(this))
     , indexToMaybeRead(-1)
     , readMarkerOnScreen(false)
-    , roomWidget(chatRoomWidget)
 {
     using namespace Quotient;
     qmlRegisterUncreatableType<QuaternionRoom>(
@@ -73,6 +72,11 @@ QuaternionRoom* TimelineWidget::currentRoom() const
     return m_messageModel->room();
 }
 
+ChatRoomWidget* TimelineWidget::roomWidget() const
+{
+    return static_cast<ChatRoomWidget*>(parent());
+}
+
 void TimelineWidget::setRoom(QuaternionRoom* newRoom)
 {
     if (currentRoom() == newRoom)
@@ -101,7 +105,7 @@ void TimelineWidget::setRoom(QuaternionRoom* newRoom)
     }
 }
 
-void TimelineWidget::focusInput() { roomWidget->focusInput(); }
+void TimelineWidget::focusInput() { roomWidget()->focusInput(); }
 
 void TimelineWidget::spotlightEvent(const QString& eventId)
 {
@@ -110,8 +114,8 @@ void TimelineWidget::spotlightEvent(const QString& eventId)
         emit viewPositionRequested(index);
         emit animateMessage(index);
     } else
-        roomWidget->setHudHtml("<font color=red>"
-                               % tr("Referenced message not found") % "</font>");
+        roomWidget()->setHudHtml("<font color=red>" % tr("Referenced message not found")
+                                 % "</font>");
 }
 
 void TimelineWidget::saveFileAs(const QString& eventId)
@@ -202,9 +206,7 @@ void TimelineWidget::showMenu(int index, const QString& hoveredLink,
                     });
     menu->addAction(QIcon::fromTheme("format-text-blockquote"),
                     tr("Quote", "a verb (do quote), not a noun (a quote)"),
-                    [this, modelIndex] {
-                        roomWidget->quote(modelIndex.data().toString());
-                    });
+                    [this, modelIndex] { roomWidget()->quote(modelIndex.data().toString()); });
 
     auto a = menu->addAction(QIcon::fromTheme("view-list-details"),
                              tr("Show details"),

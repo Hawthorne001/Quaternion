@@ -55,7 +55,6 @@ private:
     QBasicTimer maybeReadTimer;
     bool readMarkerOnScreen;
     ActivityDetector activityDetector;
-    ChatRoomWidget* roomWidget;
 
     class NamFactory : public QQmlNetworkAccessManagerFactory {
     public:
@@ -63,6 +62,7 @@ private:
     };
     NamFactory namFactory;
 
+    ChatRoomWidget* roomWidget() const;
     void reStartShownTimer();
     void timerEvent(QTimerEvent* qte) override;
     bool pendingMarkRead() const;
