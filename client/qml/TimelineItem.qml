@@ -73,7 +73,6 @@ Item {
         if (bottomEdgeShown)
             bottomEdgeShownChanged()
         readMarkerHereChanged()
-        scrollFinisher.maybeBindScrollTarget(this)
     }
 
     property bool showingDetails
