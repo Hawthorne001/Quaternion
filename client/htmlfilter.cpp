@@ -79,6 +79,15 @@ constexpr auto htmlStyleAttr = u"style";
 constexpr auto mxColorAttr = u"data-mx-color";
 constexpr auto mxBgColorAttr = u"data-mx-bg-color";
 
+#ifdef __cpp_lib_ranges_contains
+constexpr auto rangeContains = ranges::contains;
+#else
+inline auto rangeContains(const auto& c, const auto& v)
+{
+    return std::ranges::find(c, v) != std::ranges::end(c);
+}
+#endif
+
 [[nodiscard]] QString mergeMarkdown(const QString& html)
 {
     // This code intends to merge user-entered Markdown+HTML markup
@@ -225,7 +234,7 @@ constexpr auto mxBgColorAttr = u"data-mx-bg-color";
         }
         if (!inHead) {
             // Check if it's a valid (opening or closing) tag allowed in Matrix
-            if (!ranges::contains(permittedTags, tag)) {
+            if (!rangeContains(permittedTags, tag)) {
                 // Invalid tag or non-tag - either remove the abusing piece or stop and report
                 if (options.testFlag(Validate))
                     return { {},
@@ -567,7 +576,7 @@ Processor::rewrite_t Processor::filterTag(QStringView tag, QXmlStreamAttributes 
         return rewrite;
     }
 
-    if (!ranges::contains(permittedTags, tag))
+    if (!rangeContains(permittedTags, tag))
         return {}; // The tag is not allowed
 
     const auto it = ranges::find(passLists, tag, &PassList::tag);
@@ -660,7 +669,7 @@ Processor::rewrite_t Processor::filterTag(QStringView tag, QXmlStreamAttributes 
             || (tag == u"a" && aName == u"href"
                 && ranges::any_of(permittedSchemes,
                                   [&aValue](QStringView s) { return aValue.startsWith(s); }))
-            || ranges::contains(passList, a.qualifiedName()))
+            || rangeContains(passList, a.qualifiedName()))
             rewrite.front().second.push_back(std::move(a));
     } // for (a: attributes)
 
