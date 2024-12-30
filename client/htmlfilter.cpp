@@ -18,14 +18,14 @@
 using namespace std;
 using namespace Qt::StringLiterals;
 
-namespace HtmlFilter {
+namespace {
+using namespace HtmlFilter;
 
 enum Mode : unsigned char { QtToMatrix, MatrixToQt, GenericToQt };
 
 class Processor {
 public:
-    [[nodiscard]] static Result process(QString html, Mode mode,
-                                        QuaternionRoom* context,
+    [[nodiscard]] static Result process(QString html, Mode mode, QuaternionRoom* context,
                                         Options options = Default);
 
 private:
@@ -47,7 +47,7 @@ private:
     void filterText(QString& text);
 };
 
-static const auto permittedTags = std::to_array<QStringView>(
+constexpr auto permittedTags = std::to_array<QStringView>(
     { u"font",       u"del", u"h1",    u"h2",     u"h3",      u"h4",  u"h5",   u"h6",
       u"blockquote", u"p",   u"a",     u"ul",     u"ol",      u"sup", u"sub",  u"li",
       u"b",          u"i",   u"u",     u"strong", u"em",      u"s",   u"code", u"hr",
@@ -60,25 +60,24 @@ struct PassList {
 };
 
 // See filterTag() on special processing of commented out tags/attributes
-static const PassList passLists[] = {
-    { u"a", { u"name", u"target", /* "href" - only from permittedSchemes */ } },
-    { u"img", { u"width", u"height", u"alt", u"title", u"data-mx-emoticon"
-               /* "src" - only 'mxc:' */ } },
+const auto passLists = std::to_array<PassList>({
+    { u"a", { u"name", u"target", /* u"href" - only from permittedSchemes */ } },
+    { u"img",
+      { u"width", u"height", u"alt", u"title", u"data-mx-emoticon", /* u"src" - only 'mxc:' */ } },
     { u"ol", { u"start" } },
     { u"font", { u"color", u"data-mx-color", u"data-mx-bg-color" } },
-    { u"span", { u"color", u"data-mx-color", u"data-mx-bg-color" } }
-    //, { "code", { "class" /* must start with 'language-' */ } } // Special case
-};
+    { u"span", { u"color", u"data-mx-color", u"data-mx-bg-color" } },
+    // { u"code", { u"class" /* must start with 'language-' */ } }
+});
 
-static QStringView const permittedSchemes[]{
-    u"http:",   u"https:",  u"ftp:", u"mailto:",
-    u"magnet:", u"matrix:", u"mxc:" /* MSC2398 */
-};
+constexpr auto permittedSchemes = std::to_array<QStringView>({
+    u"http:", u"https:", u"ftp:", u"mailto:", u"magnet:", u"matrix:", u"mxc:" /* MSC2398 */
+});
 
-static const auto htmlColorAttr = u"color";
-static const auto htmlStyleAttr = u"style";
-static const auto mxColorAttr = u"data-mx-color";
-static const auto mxBgColorAttr = u"data-mx-bg-color";
+constexpr auto htmlColorAttr = u"color";
+constexpr auto htmlStyleAttr = u"style";
+constexpr auto mxColorAttr = u"data-mx-color";
+constexpr auto mxBgColorAttr = u"data-mx-bg-color";
 
 [[nodiscard]] QString mergeMarkdown(const QString& html)
 {
@@ -333,37 +332,6 @@ Result Processor::process(QString html, Mode mode, QuaternionRoom* context,
     return { resultHtml.trimmed(), p.errorPos, p.errorString };
 }
 
-QString toMatrixHtml(const QString& qtMarkup, QuaternionRoom* context,
-                     Options options)
-{
-    // Validation of HTML emitted by Qt doesn't make much sense
-    Q_ASSERT(!options.testFlag(Validate));
-    const auto& result =
-        Processor::process(qtMarkup, QtToMatrix, context, options);
-    Q_ASSERT(result.errorPos == -1);
-    return result.filteredHtml;
-}
-
-Result fromMatrixHtml(const QString& matrixHtml, QuaternionRoom* context,
-                      Options options)
-{
-    // Matrix HTML body should never be treated as Markdown
-    Q_ASSERT(!options.testFlag(ConvertMarkdown));
-    auto result = Processor::process(matrixHtml, MatrixToQt, context, options);
-    if (result.errorPos == -1) {
-        // Make sure to preserve whitespace sequences
-        result.filteredHtml = "<span style=\"white-space: pre-wrap\">"
-                              % result.filteredHtml % "</span>";
-    }
-    return result;
-}
-
-Result fromLocalHtml(const QString& html,
-                     QuaternionRoom* context, Options options)
-{
-    return Processor::process(html, GenericToQt, context, options);
-}
-
 namespace {
     class EntityResolver : public QXmlStreamEntityResolver {
     public:
@@ -446,6 +414,10 @@ void Processor::runOn(const QString &html)
                     bodyOffset = -1; // See the end of the while loop
                     break;
                 }
+            }
+            if (options.testFlag(StripMxReply) && tagName == u"mx-reply") {
+                reader.skipCurrentElement();
+                continue;
             }
 
             const auto& attrs = reader.attributes();
@@ -764,6 +736,36 @@ void Processor::filterText(QString& text)
     Processor(mode, Fragment, context, writer).runOn(text);
 
     text.clear();
+}
+}
+
+namespace HtmlFilter {
+
+QString toMatrixHtml(const QString& qtMarkup, QuaternionRoom* context, Options options)
+{
+    // Validation of HTML emitted by Qt doesn't make much sense
+    Q_ASSERT(!options.testFlag(Validate));
+    const auto& result = Processor::process(qtMarkup, QtToMatrix, context, options);
+    Q_ASSERT(result.errorPos == -1);
+    return result.filteredHtml;
+}
+
+Result fromMatrixHtml(const QString& matrixHtml, QuaternionRoom* context, Options options)
+{
+    // Matrix HTML body should never be treated as Markdown
+    Q_ASSERT(!options.testFlag(ConvertMarkdown));
+    auto result = Processor::process(matrixHtml, MatrixToQt, context, options);
+    if (result.errorPos == -1) {
+        // Make sure to preserve whitespace sequences
+        result.filteredHtml =
+            "<span style=\"white-space: pre-wrap\">" % result.filteredHtml % "</span>";
+    }
+    return result;
+}
+
+Result fromLocalHtml(const QString& html, QuaternionRoom* context, Options options)
+{
+    return Processor::process(html, GenericToQt, context, options);
 }
 
 } // namespace HtmlFilter

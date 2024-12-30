@@ -10,15 +10,17 @@ Q_NAMESPACE
 
 enum Option : unsigned char {
     Default = 0x0,
-    /// Treat `<body>` contents as Markdown (toMatrixHtml() only)
+    //! Treat `<body>` contents as Markdown (toMatrixHtml() only)
     ConvertMarkdown = 0x1,
-    /// Treat `<body>` contents as a fragment in a bigger HTML payload
-    /// (suppresses markup processing inside HTML elements and `<mx-reply>`
-    /// conversion - toMatrixHtml() only)
+    //! Treat `<body>` contents as a fragment in a bigger HTML payload
+    //! (suppresses markup processing inside HTML elements and `<mx-reply>`
+    //! conversion - toMatrixHtml() only)
     Fragment = 0x2,
-    /// Stop at tags not allowed in Matrix, instead of ignoring them
-    /// (from*Html() functions only)
-    Validate = 0x4
+    //! Stop at tags not allowed in Matrix, instead of ignoring them
+    //! (from*Html() functions only)
+    Validate = 0x4,
+    //! Remove <mx-reply> elements previously used for reply fallbacks
+    StripMxReply = 0x8
 };
 Q_ENUM_NS(Option)
 Q_DECLARE_FLAGS(Options, Option)
