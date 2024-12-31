@@ -337,6 +337,7 @@ Item {
                     horizontalAlignment: Text.AlignLeft
                     wrapMode: Text.Wrap
                     color: foreground
+                    font: settings.font
                     renderType: settings.render_type
 
                     onHoveredLinkChanged:
@@ -582,10 +583,16 @@ Item {
                 id: detailsHeader
                 width: parent.width
                 height: childrenRect.height
+                readonly property var boldFontInfo: FontMetrics {
+                    font.family: settings.font.family
+                    font.pointSize: settings.font.pointSize
+                    font.bold: true
+                }
+                readonly property var boldFont: boldFontInfo.font
 
                 TextEdit {
                     text: "<" + dateTime.toLocaleString(Qt.locale(), Locale.ShortFormat) + ">"
-                    font.bold: true
+                    font: parent.boldFont
                     renderType: settings.render_type
                     readOnly: true
                     selectByKeyboard: true; selectByMouse: true
@@ -599,7 +606,7 @@ Item {
                     id: eventTitle
                     text: "<a href=\"" + evtLink + "\">"+ eventId + "</a>"
                     textFormat: Text.RichText
-                    font.bold: true
+                    font: parent.boldFont
                     renderType: settings.render_type
                     horizontalAlignment: Text.AlignHCenter
                     readOnly: true
@@ -618,7 +625,7 @@ Item {
                 TextEdit {
                     text: eventClassName
                     textFormat: Text.PlainText
-                    font.bold: true
+                    font: parent.boldFont
                     renderType: settings.render_type
 
                     anchors.top: eventTitle.bottom
