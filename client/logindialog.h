@@ -20,18 +20,6 @@ class AccountSettings;
 class AccountRegistry;
 }
 
-#if QT_VERSION_MAJOR > 5
-using DeleteLater = QScopedPointerDeleteLater;
-#else
-struct DeleteLater {
-    void operator()(Quotient::Connection* ptr)
-    {
-        if (ptr)
-            ptr->deleteLater();
-    }
-};
-#endif
-
 static const auto E2eeEnabledSetting = QStringLiteral("enable_e2ee");
 
 class LoginDialog : public Dialog {
@@ -66,5 +54,5 @@ private:
     QLineEdit* serverEdit;
     QCheckBox* saveTokenCheck;
 
-    std::unique_ptr<Quotient::Connection, DeleteLater> m_connection;
+    Quotient::QObjectHolder<Quotient::Connection> m_connection;
 };

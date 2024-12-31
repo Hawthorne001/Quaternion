@@ -19,10 +19,9 @@
 #include <QtWidgets/QAbstractItemView>
 
 #include <Quotient/connection.h>
+#include <Quotient/ranges_extras.h>
 #include <Quotient/room.h>
 #include <Quotient/user.h>
-
-#include <ranges>
 
 UserListModel::UserListModel(QAbstractItemView* parent)
     : QAbstractListModel(parent), m_currentRoom(nullptr)
@@ -162,11 +161,9 @@ void UserListModel::filter(const QString& filterString)
     QElapsedTimer et; et.start();
 
     beginResetModel();
-    // TODO: use std::ranges::to() once it's available from all stdlibs Quotient builds with
-    auto filteredMembersView =
+    auto filteredMembers = Quotient::rangeTo<QList>(
         std::views::filter(m_currentRoom->joinedMembers(),
-                           Quotient::memberMatcher(filterString, Qt::CaseInsensitive));
-    QList filteredMembers(filteredMembersView.begin(), filteredMembersView.end());
+                           Quotient::memberMatcher(filterString, Qt::CaseInsensitive)));
     std::ranges::sort(filteredMembers, Quotient::MemberSorter());
     const auto sortedIds = std::views::transform(filteredMembers, &RoomMember::id);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
