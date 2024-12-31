@@ -575,10 +575,6 @@ Item {
             color: palette.button
             border.color: palette.mid
 
-            readonly property url evtLink:
-                "https://matrix.to/#/" + room.id + "/" + eventId
-            readonly property string sourceText: toolTip
-
             Item {
                 id: detailsHeader
                 width: parent.width
@@ -603,6 +599,8 @@ Item {
                     z: 1
                 }
                 TextEdit {
+                    readonly property url evtLink: "https://matrix.to/#/" + room.id + "/" + eventId
+
                     id: eventTitle
                     text: "<a href=\"" + evtLink + "\">"+ eventId + "</a>"
                     textFormat: Text.RichText
@@ -632,13 +630,6 @@ Item {
                     anchors.right: parent.right
                     anchors.rightMargin: 3
                 }
-
-                TextEdit {
-                    id: permalink
-                    text: evtLink
-                    renderType: settings.render_type
-                    width: 0; height: 0; visible: false
-                }
             }
 
             ScrollView {
@@ -650,6 +641,8 @@ Item {
                 ScrollBar.vertical.policy: ScrollBar.AlwaysOn
 
                 TextEdit {
+                    readonly property string sourceText: toolTip
+
                     text: sourceText
                     textFormat: Text.PlainText
                     readOnly: true;

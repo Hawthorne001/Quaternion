@@ -589,7 +589,7 @@ Page {
         color: palette.alternateBase
         property bool shown: (chatView.bottommostVisibleIndex >= 0
                               && (scrollerArea.containsMouse || scrollAnimation.running))
-                             || (room?.requestedHistorySize > 0)
+                             || room?.requestedHistorySize > 0
 
         onShownChanged: {
             if (shown) {
