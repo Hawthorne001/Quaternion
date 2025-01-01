@@ -317,6 +317,9 @@ Page {
             function onViewPositionRequested(index) {
                 scrollFinisher.scrollViewTo(index, ListView.Contain)
             }
+            function onHistoryRequestChanged() {
+                scrollToReadMarkerButton.checked = controller.isHistoryRequestRunning
+            }
         }
 
         Connections {
@@ -686,8 +689,11 @@ Page {
             if (messageModel.readMarkerVisualIndex < chatView.count)
                 scrollFinisher.scrollViewTo(messageModel.readMarkerVisualIndex,
                                             ListView.Center)
-            else
-                room.getPreviousContent(chatView.count / 2) // FIXME, #799
+            else {
+                checkable = true
+                controller.ensureLastReadEvent()
+            }
         }
+        onCheckedChanged: { if (!checked) checkable = false }
     }
 }

@@ -21,6 +21,7 @@ public:
     QString selectedText() const;
     QuaternionRoom* currentRoom() const;
     Q_INVOKABLE Qt::KeyboardModifiers getModifierKeys() const;
+    Q_INVOKABLE bool isHistoryRequestRunning() const;
 
 signals:
     void resourceRequested(const QString& idOrUri, const QString& action = {});
@@ -32,6 +33,7 @@ signals:
     void showDetails(int currentIndex);
     void viewPositionRequested(int index);
     void animateMessage(int currentIndex);
+    void historyRequestChanged();
 
 public slots:
     void setRoom(QuaternionRoom* room);
@@ -44,6 +46,7 @@ public slots:
                   const QString& selectedText, bool showingDetails);
     void reactionButtonClicked(const QString& eventId, const QString& key);
     void setGlobalSelectionBuffer(const QString& text);
+    void ensureLastReadEvent();
 
 private:
     MessageEventModel* m_messageModel;
@@ -55,6 +58,7 @@ private:
     QBasicTimer maybeReadTimer;
     bool readMarkerOnScreen;
     ActivityDetector activityDetector;
+    QFuture<void> historyRequest;
 
     class NamFactory : public QQmlNetworkAccessManagerFactory {
     public:

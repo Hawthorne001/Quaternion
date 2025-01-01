@@ -277,6 +277,25 @@ void TimelineWidget::setGlobalSelectionBuffer(const QString& text)
     m_selectedText = text;
 }
 
+void TimelineWidget::ensureLastReadEvent()
+{
+    auto r = currentRoom();
+    if (!r)
+        return;
+    if (!historyRequest.isCanceled()) { // Second click cancels the request
+        historyRequest.cancel();
+        return;
+    }
+    // Store the future as is, without continuations, so that it could be cancelled
+    historyRequest = r->ensureHistory(r->lastFullyReadEventId());
+    historyRequest.then([this](auto) {
+        qCDebug(TIMELINE, "Loaded enough history to get the last fully read event, now scrolling");
+        emit viewPositionRequested(m_messageModel->findRow(currentRoom()->lastFullyReadEventId()));
+    });
+}
+
+bool TimelineWidget::isHistoryRequestRunning() const { return historyRequest.isRunning(); }
+
 void TimelineWidget::reStartShownTimer()
 {
     if (!readMarkerOnScreen || indicesOnScreen.empty()

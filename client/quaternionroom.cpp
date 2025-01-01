@@ -14,6 +14,8 @@
 #include <Quotient/events/roommessageevent.h>
 #include <QtCore/QRegularExpression>
 
+#include <ranges>
+
 using namespace Quotient;
 
 QuaternionRoom::QuaternionRoom(Connection* connection, QString roomId, JoinState joinState)
@@ -96,6 +98,7 @@ void QuaternionRoom::onAddHistoricalTimelineEvents(rev_iter_t from)
 {
     std::for_each(from, messageEvents().crend(),
                   std::bind_front(&QuaternionRoom::checkForHighlights, this));
+    checkForRequestedEvents(from);
 }
 
 void QuaternionRoom::checkForHighlights(const Quotient::TimelineItem& ti)
@@ -130,5 +133,83 @@ void QuaternionRoom::checkForHighlights(const Quotient::TimelineItem& ti)
         const auto& roomMemberMatch = roomMemberExpressions[memberName].match(text, 0, MatchOpt);
         if (localMatch.hasMatch() || roomMemberMatch.hasMatch())
             highlights.insert(e);
+    }
+}
+
+QuaternionRoom::EventFuture QuaternionRoom::ensureHistory(const QString& upToEventId,
+                                                          quint16 maxWaitSeconds)
+{
+    if (auto eventIt = findInTimeline(upToEventId); eventIt != historyEdge())
+        return makeReadyVoidFuture();
+
+    if (allHistoryLoaded())
+        return {};
+    // Request a small number of events (or whatever the ongoing request says, if there's any),
+    // to make sure checkForRequestedEvents() gets executed
+    getPreviousContent();
+    HistoryRequest r{ upToEventId,
+                      QDeadlineTimer{ std::chrono::seconds(maxWaitSeconds), Qt::VeryCoarseTimer } };
+    auto future = r.promise.future();
+    r.promise.start();
+    historyRequests.push_back(std::move(r));
+    return future;
+}
+
+namespace {
+using namespace std::ranges;
+template <typename RangeT>
+    requires(std::convertible_to<range_reference_t<RangeT>, QString>)
+inline auto dumpJoined(const RangeT& range, const QString& separator = u","_s)
+{
+    return
+#if defined(__cpp_lib_ranges_join_with) && defined(__cpp_lib_ranges_to_container)
+        to<QString>(join_with_view(range, separator));
+#else
+        QStringList(begin(range), end(range)).join(separator);
+#endif
+}
+}
+
+void QuaternionRoom::checkForRequestedEvents(const rev_iter_t& from)
+{
+    using namespace std::ranges;
+    const auto addedRange = subrange(from, historyEdge());
+    for (const auto& evtId : transform_view(addedRange, &RoomEvent::id)) {
+        cachedEvents.erase(evtId);
+        onGettingSingleEvent(evtId);
+    }
+    std::erase_if(historyRequests, [this, addedRange](HistoryRequest& request) {
+        auto& [upToEventId, deadline, promise] = request;
+        if (promise.isCanceled()) {
+            qCInfo(MAIN) << "The request to ensure event" << upToEventId << "has been cancelled";
+            return true;
+        }
+        if (auto it = find(addedRange, upToEventId, &RoomEvent::id); it != historyEdge()) {
+            promise.finish();
+            return true;
+        }
+        if (deadline.hasExpired()) {
+            qCWarning(MAIN) << "Timeout - giving up on obtaining event" << upToEventId;
+            promise.future().cancel();
+            return true;
+        }
+        return false;
+    });
+    if (!historyRequests.empty()) {
+        auto requestedIds =
+            dumpJoined(transform_view(historyRequests, &HistoryRequest::upToEventId));
+        if (allHistoryLoaded()) {
+            qCDebug(MAIN).noquote() << "Could not find in the whole room history:" << requestedIds;
+            for_each(historyRequests, [](auto& r) { r.promise.future().cancel(); });
+            historyRequests.clear();
+        }
+        static constexpr auto EventsProgression = std::array{ 50, 100, 200, 500, 1000 };
+        static_assert(is_sorted(EventsProgression));
+        const auto thisMany = requestedHistorySize() >= EventsProgression.back()
+                                  ? EventsProgression.back()
+                                  : *upper_bound(EventsProgression, requestedHistorySize());
+        qCDebug(MAIN).noquote() << "Requesting" << thisMany << "events, looking for"
+                                << requestedIds;
+        getPreviousContent(thisMany);
     }
 }
