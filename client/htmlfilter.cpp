@@ -313,6 +313,24 @@ Result Processor::process(QString html, Mode mode, QuaternionRoom* context,
         "&(?!(#[0-9]+|#x[0-9a-fA-F]+|[[:alpha:]_][-[:alnum:]_:.]*);)") };
     html.replace(freestandingAmps, QStringLiteral("&amp;"));
 
+    if (mode != GenericToQt) {
+        // Handling control codes (excluding, for this discussion, \n, \r, and \t) in HTML is
+        // somewhat messy. HTML 4 and XML 1.0 and XHTML 1.0 all disallow C0/C1 control codes in any
+        // form. XML 1.1 allows them as numeric character references (aka NCRs) but
+        // QXmlStreamReader only implements XML 1.0 and doesn't accept them even as NCRs.
+        // Meanwhile, QTextDocument emits control codes to HTML without any conversion, formally
+        // violating HTML 4 spec (https://bugreports.qt.io/browse/QTBUG-122466) and, more
+        // importantly for this code, upsetting QXmlStreamReader (#900). HTML 5 (which Matrix HTML
+        // is - assumed to be - based on) formally disallows control codes too, adding \f to the
+        // allowed exclusions (see https://dev.w3.org/html5/spec-LC/syntax.html#text-0) which gives
+        // us the right to eliminate control characters from Matrix payloads, even though the Web
+        // generally seems to admit them as NCRs.
+        // NB: [:cntrl:] doesn't work because it includes the allowed \n, \r, \t
+        static const auto controlCharRE =
+            QRegularExpression{ R"([\x01-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f])"_L1 };
+        html.remove(controlCharRE);
+    }
+
     if (mode == QtToMatrix) {
         if (options.testFlag(ConvertMarkdown)) {
             // The processor handles Markdown in chunks between HTML tags;
