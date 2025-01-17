@@ -72,7 +72,7 @@ jobs:
 
     env:
       QTKEYCHAIN_REF: 0.14.3
-      QUOTIENT_REF: dev
+      QUOTIENT_REF: 0.9.x
       VERSION: ${{ needs.Prepare.outputs.version }}
 
     steps:
