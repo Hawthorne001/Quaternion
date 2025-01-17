@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <Quotient/csapi/rooms.h>
+
 #include <Quotient/room.h>
 
 #include <QtCore/QDeadlineTimer>
@@ -16,6 +18,8 @@ class QuaternionRoom: public Quotient::Room
 {
     Q_OBJECT
 public:
+    using RoomEvent = Quotient::RoomEvent;
+
     QuaternionRoom(Quotient::Connection* connection, QString roomId,
                    Quotient::JoinState joinState);
 
@@ -46,7 +50,12 @@ public:
     //!         is not found
     Q_INVOKABLE EventFuture ensureHistory(const QString& upToEventId, quint16 maxWaitSeconds = 20);
 
-  private:
+    //! \brief Obtain an arbitrary room event by its id that is available locally
+    //!
+    Q_INVOKABLE const Quotient::RoomEvent* getSingleEvent(const QString& eventId,
+                                                          const QString& originEventId);
+
+private:
     using EventPromise = QPromise<void>;
     using EventId = Quotient::EventId;
 
@@ -57,13 +66,21 @@ public:
     };
     std::vector<HistoryRequest> historyRequests;
 
-    QSet<const Quotient::RoomEvent*> highlights;
+    struct SingleEventRequest {
+        EventId eventId;
+        Quotient::JobHandle<Quotient::GetOneRoomEventJob> requestHandle;
+        std::vector<QString> eventIdsToRefresh{};
+    };
+    std::vector<SingleEventRequest> singleEventRequests;
+    std::unordered_map<EventId, Quotient::event_ptr_tt<const RoomEvent>> cachedEvents;
+
+    QSet<const RoomEvent*> highlights;
     QString m_cachedUserFilter;
-    int m_requestedEventsCount = 0;
 
     void onAddNewTimelineEvents(timeline_iter_t from) override;
     void onAddHistoricalTimelineEvents(rev_iter_t from) override;
 
     void checkForHighlights(const Quotient::TimelineItem& ti);
     void checkForRequestedEvents(const rev_iter_t& from);
+    void onGettingSingleEvent(const QString& evtId);
 };

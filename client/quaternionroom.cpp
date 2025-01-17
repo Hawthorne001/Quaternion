@@ -10,8 +10,10 @@
 
 #include "logging_categories.h"
 
-#include <Quotient/user.h>
 #include <Quotient/events/roommessageevent.h>
+
+#include <Quotient/user.h>
+
 #include <QtCore/QRegularExpression>
 
 #include <ranges>
@@ -86,6 +88,41 @@ bool QuaternionRoom::canRedact(const Quotient::EventId& eventId) const
         return currentUserPl >= ple->redact() && currentUserPl >= ple->powerLevelForUser(memberId);
     }
     return false;
+}
+
+void QuaternionRoom::onGettingSingleEvent(const QString& evtId)
+{
+    std::erase_if(singleEventRequests, [this, evtId](SingleEventRequest& r) {
+        if (!r.requestHandle.isFinished())
+            r.requestHandle.abandon();
+        std::ranges::for_each(r.eventIdsToRefresh, std::bind_front(&Room::updatedEvent, this));
+        return r.eventId == evtId;
+    });
+}
+
+const RoomEvent* QuaternionRoom::getSingleEvent(const QString& eventId, const QString& originEventId)
+{
+    if (auto timelineIt = findInTimeline(eventId); timelineIt != historyEdge())
+        return timelineIt->event();
+    if (auto cachedIt = cachedEvents.find(eventId); cachedIt != cachedEvents.cend())
+        return cachedIt->second.get();
+
+    auto requestIt = std::ranges::find(singleEventRequests, eventId, &SingleEventRequest::eventId);
+    if (requestIt == singleEventRequests.cend())
+        requestIt = singleEventRequests.insert(
+            requestIt,
+            { eventId, connection()
+                           ->callApi<GetOneRoomEventJob>(id(), eventId)
+                           .then([this](RoomEventPtr&& pEvt) {
+                               const auto [it, cachedEventInserted] =
+                                   cachedEvents.insert_or_assign(pEvt->id(), std::move(pEvt));
+                               if (QUO_ALARM(!cachedEventInserted))
+                                   emit updatedEvent(it->first); // At least notify clients...
+                               onGettingSingleEvent(it->first);
+                           }) });
+    requestIt->eventIdsToRefresh.push_back(originEventId);
+
+    return nullptr;
 }
 
 void QuaternionRoom::onAddNewTimelineEvents(timeline_iter_t from)
