@@ -174,6 +174,7 @@ void LoginDialog::setup(const QString& statusMessage)
                              ? tr("The homeserver is available")
                              : tr("Could not connect to the homeserver"));
         button(QDialogButtonBox::Ok)->setEnabled(!m_connection->loginFlows().isEmpty());
+        passwordEdit->setEnabled(m_connection->supportsPasswordAuth());
     });
     // This overrides the above in case of an unsuccessful attempt to resolve
     // the server URL from a changed MXID
