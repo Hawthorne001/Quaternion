@@ -23,7 +23,7 @@ using namespace HtmlFilter;
 
 enum Mode : unsigned char { QtToMatrix, MatrixToQt, GenericToQt };
 
-class Processor {
+class Processor : public QXmlStreamEntityResolver {
 public:
     [[nodiscard]] static Result process(QString html, Mode mode, QuaternionRoom* context,
                                         Options options = Default);
@@ -39,12 +39,18 @@ private:
     Processor(Mode mode, Options options, QuaternionRoom* context, QXmlStreamWriter& writer)
         : mode(mode), options(options), context(context), writer(writer)
     {}
+    Q_DISABLE_COPY_MOVE(Processor)
     void runOn(const QString& html);
 
     using rewrite_t = vector<pair<QString, QXmlStreamAttributes>>;
 
     [[nodiscard]] rewrite_t filterTag(QStringView tag, QXmlStreamAttributes attributes);
     void filterText(QString& text);
+
+    QString resolveUndeclaredEntity(const QString& name) override
+    {
+        return name == u"nbsp" ? u"\xa0"_s : QString();
+    }
 };
 
 constexpr auto permittedTags = std::to_array<QStringView>(
@@ -359,25 +365,10 @@ Result Processor::process(QString html, Mode mode, QuaternionRoom* context,
     return { resultHtml.trimmed(), p.errorPos, p.errorString };
 }
 
-namespace {
-    class EntityResolver : public QXmlStreamEntityResolver {
-    public:
-        using QXmlStreamEntityResolver::QXmlStreamEntityResolver;
-        Q_DISABLE_COPY_MOVE(EntityResolver)
-
-    private:
-        QString resolveUndeclaredEntity(const QString& name) override
-        {
-            return name == u"nbsp" ? QStringLiteral("\xa0") : QString();
-        }
-    };
-    EntityResolver entityResolver;
-}
-
 void Processor::runOn(const QString &html)
 {
     QXmlStreamReader reader(html);
-    reader.setEntityResolver(&entityResolver);
+    reader.setEntityResolver(this);
 
     /// The entry in the (outer) stack corresponds to each level in the source
     /// document; the (inner) stack in each entry records open elements in the
