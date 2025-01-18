@@ -288,10 +288,15 @@ void TimelineWidget::ensureLastReadEvent()
     }
     // Store the future as is, without continuations, so that it could be cancelled
     historyRequest = r->ensureHistory(r->lastFullyReadEventId());
-    historyRequest.then([this](auto) {
-        qCDebug(TIMELINE, "Loaded enough history to get the last fully read event, now scrolling");
-        emit viewPositionRequested(m_messageModel->findRow(currentRoom()->lastFullyReadEventId()));
-    });
+    historyRequest
+        .then([this](auto) {
+            qCDebug(TIMELINE,
+                    "Loaded enough history to get the last fully read event, now scrolling");
+            emit viewPositionRequested(
+                m_messageModel->findRow(currentRoom()->lastFullyReadEventId()));
+            emit historyRequestChanged();
+        })
+        .onCanceled([this] { emit historyRequestChanged(); });
 }
 
 bool TimelineWidget::isHistoryRequestRunning() const { return historyRequest.isRunning(); }
