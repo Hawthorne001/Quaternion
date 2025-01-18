@@ -436,34 +436,19 @@ QString ChatRoomWidget::sendFile()
     return {};
 }
 
-void sendMarkdown(QuaternionRoom* room, const QTextDocumentFragment& text)
+void ChatRoomWidget::sendSelection(int fromPosition, HtmlFilter::Options htmlFilterOptions)
 {
-    room->postHtmlText(text.toPlainText(),
-                       HtmlFilter::toMatrixHtml(text.toHtml(), room,
-                                                HtmlFilter::ConvertMarkdown));
+    QTextCursor c(m_chatEdit->document());
+    c.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, fromPosition);
+    c.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
+    currentRoom()->sendMessage(c.selection(), htmlFilterOptions);
 }
 
 void ChatRoomWidget::sendMessage()
 {
-    if (m_chatEdit->toPlainText().startsWith("//"))
-        QTextCursor(m_chatEdit->document()).deleteChar();
-
-    if (m_uiSettings.get("auto_markdown", false)) {
-        sendMarkdown(currentRoom(),
-                     QTextDocumentFragment(m_chatEdit->document()));
-        return;
-    }
-    const auto& plainText = m_chatEdit->toPlainText();
-    const auto& htmlText =
-        HtmlFilter::toMatrixHtml(m_chatEdit->toHtml(), currentRoom());
-    Q_ASSERT(!plainText.isEmpty() && !htmlText.isEmpty());
-    // Send plain text if htmlText has no markup or just <br/> elements
-    // (those are easily represented as line breaks in plain text)
-    static const QRegularExpression MarkupRE { "<(?![Bb][Rr])" };
-    if (htmlText.contains(MarkupRE))
-        currentRoom()->postHtmlText(plainText, htmlText);
-    else
-        currentRoom()->postPlainText(plainText);
+    sendSelection(m_chatEdit->toPlainText().startsWith("//") ? 1 : 0,
+                  m_uiSettings.get("auto_markdown", false) ? HtmlFilter::ConvertMarkdown
+                                                           : HtmlFilter::Default);
 }
 
 static auto NothingToSendMsg()
@@ -683,19 +668,13 @@ QString ChatRoomWidget::sendCommand(QStringView command,
                       "%1 is a position of the error; %2 is the error message")
                    .arg(errorPos).arg(errorString);
 
-        const auto& fragment = QTextDocumentFragment::fromHtml(cleanQtHtml);
-        currentRoom()->postHtmlText(fragment.toPlainText(),
-                                    HtmlFilter::toMatrixHtml(fragment.toHtml(),
-                                                             currentRoom()));
+        currentRoom()->sendMessage(QTextDocumentFragment::fromHtml(cleanQtHtml));
         return {};
     }
     if (command == u"md") {
-        // Select everything after /md and one whitespace character after it
+        // Send the part after /md and one whitespace character after it
         // (leading whitespaces have meaning in Markdown)
-        QTextCursor c(m_chatEdit->document());
-        c.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, 4);
-        c.movePosition(QTextCursor::End, QTextCursor::KeepAnchor);
-        sendMarkdown(currentRoom(), c.selection());
+        sendSelection(4, HtmlFilter::ConvertMarkdown);
         return {};
     }
     if (command == u"query" || command == u"dc")

@@ -9,6 +9,7 @@
 #pragma once
 
 #include "chatedit.h"
+#include "htmlfilter.h"
 
 #include <Quotient/settings.h>
 
@@ -78,6 +79,7 @@ class ChatRoomWidget : public QWidget
 
         QString sendFile();
         void sendMessage();
+        void sendSelection(int fromPosition, HtmlFilter::Options htmlFilterOptions);
         [[nodiscard]] QString sendCommand(QStringView command,
                                           const QString& argString);
 

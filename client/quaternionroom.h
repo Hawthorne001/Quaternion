@@ -8,11 +8,15 @@
 
 #pragma once
 
+#include "htmlfilter.h"
+
 #include <Quotient/csapi/rooms.h>
 
 #include <Quotient/room.h>
 
 #include <QtCore/QDeadlineTimer>
+
+class QTextDocumentFragment;
 
 class QuaternionRoom: public Quotient::Room
 {
@@ -54,6 +58,9 @@ public:
     //!
     Q_INVOKABLE const Quotient::RoomEvent* getSingleEvent(const QString& eventId,
                                                           const QString& originEventId);
+
+    void sendMessage(const QTextDocumentFragment& richText,
+                     HtmlFilter::Options htmlFilterOptions = HtmlFilter::Default);
 
 private:
     using EventPromise = QPromise<void>;
