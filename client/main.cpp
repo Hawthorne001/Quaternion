@@ -110,14 +110,6 @@ int main( int argc, char* argv[] )
         QApplication::setFont(font);
     }
 
-    // We should not need to do the following, as quitOnLastWindowClosed is
-    // set to "true" by default; might be a bug, see
-    // https://forum.qt.io/topic/71112/application-does-not-quit
-    QObject::connect(&app, &QApplication::lastWindowClosed, &app, [&app]{
-        qCDebug(MAIN) << "Last window closed!";
-        QApplication::postEvent(&app, new QEvent(QEvent::Quit));
-    });
-
     QCommandLineParser parser;
     parser.setApplicationDescription(QApplication::translate("main",
             "Quaternion - an IM client for the Matrix protocol"));

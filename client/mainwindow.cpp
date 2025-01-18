@@ -41,6 +41,7 @@
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QMessageBox>
+#include <QtWidgets/QProgressDialog>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QStatusBar>
 
@@ -58,6 +59,8 @@
 #include <QtGui/QPixmap>
 #include <QtNetwork/QAuthenticator>
 #include <QtNetwork/QNetworkReply>
+
+using namespace Qt::StringLiterals;
 
 MainWindow::MainWindow()
 {
@@ -130,8 +133,6 @@ MainWindow::MainWindow()
 MainWindow::~MainWindow()
 {
     saveSettings();
-    for (auto* acc: std::as_const(logoutOnExit))
-        logout(acc);
     accountRegistry->disconnect(this);
 }
 
@@ -949,16 +950,17 @@ void MainWindow::reloginNeeded(Connection* c, const QString& message)
     showLoginWindow(message, c->userId());
 }
 
-void MainWindow::logout(Connection* c)
+QFuture<QString> MainWindow::logout(Connection* c)
 {
-    Q_ASSERT_X(c, __FUNCTION__, "Logout on a null connection");
+    if (QUO_ALARM_X(!c, "Logout on a null connection"_L1))
+        return {};
 
     // libQuotient takes care about the new location but not the old one
     using namespace QKeychain;
-    auto* job = new DeletePasswordJob(qAppName(), this);
-    job->setKey(accessTokenKey(*c, true));
-    connect(job, &Job::finished, this, [this, job] {
-        switch (job->error()) {
+    auto* keychainJob = new DeletePasswordJob(qAppName(), this);
+    keychainJob->setKey(accessTokenKey(*c, true));
+    auto keychainFt = QtFuture::connect(keychainJob, &Job::finished).then(this, [this](Job* j) {
+        switch (j->error()) {
         case Error::EntryNotFound:
         case Error::NoError: return;
         // Actual errors follow
@@ -971,13 +973,13 @@ void MainWindow::logout(Connection* c)
                                     "token from the keychain."),
                                  QMessageBox::Close);
         }
-        qCWarning(MAIN).noquote()
-            << "Could not delete access token from the keychain: "
-            << qUtf8Printable(job->errorString());
+        qCWarning(MAIN).noquote() << "Could not delete access token from the keychain: "
+                                  << QUO_CSTR(j->errorString());
     });
-    job->start();
-
-    c->logout();
+    keychainJob->start();
+    return QtFuture::whenAll(keychainFt, c->logout()).then([userId = c->userId()](auto) {
+        return userId;
+    });
 }
 
 Quotient::UriResolveResult MainWindow::visitUser(Quotient::User* user,
@@ -1413,14 +1415,33 @@ void MainWindow::proxyAuthenticationRequired(const QNetworkProxy&,
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    if (Quotient::SettingsGroup("UI")
-            .value("close_to_tray", false).toBool())
-    {
+    if (Quotient::Settings{}.get("UI/close_to_tray", false)) {
         hide();
         event->ignore();
+        return;
     }
-    else
-    {
+    if (logoutOnExit.empty()) {
+        qCDebug(MAIN, "Closing down");
         event->accept();
+        return;
     }
+
+    event->ignore(); // Got some finalization to do, can't exit yet
+    qCDebug(MAIN) << "Logging out" << logoutOnExit.size() << "account(s) that don't stay logged in";
+    auto dlg = new QProgressDialog(u"Logging out"_s, u"Exit now"_s, 0,
+                                   static_cast<int>(logoutOnExit.size()));
+    dlg->setMinimumDuration(1000);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    for (auto* c : logoutOnExit)
+        logout(c).then([this, dlg](auto) {
+            // By now, MainWindow::dropConnection() has already worked, in particular the logged out
+            // account was removed from logoutOnExit.
+            dlg->setValue(dlg->maximum() - static_cast<int>(logoutOnExit.size()));
+            if (logoutOnExit.empty()) {
+                qCDebug(MAIN, "All accounts to log out on exit have logged out");
+                // NB: this causes a new QCloseEvent coming on MainWindow but logoutOnExit is empty
+                // already, leading to the early finish of this new closeEvent() invocation
+                qApp->quit();
+            }
+        });
 }
