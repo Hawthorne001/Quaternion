@@ -94,10 +94,13 @@ bool QuaternionRoom::canRedact(const Quotient::EventId& eventId) const
 void QuaternionRoom::onGettingSingleEvent(const QString& evtId)
 {
     std::erase_if(singleEventRequests, [this, evtId](SingleEventRequest& r) {
-        if (!r.requestHandle.isFinished())
-            r.requestHandle.abandon();
-        std::ranges::for_each(r.eventIdsToRefresh, std::bind_front(&Room::updatedEvent, this));
-        return r.eventId == evtId;
+        const bool idMatches = r.eventId == evtId;
+        if (idMatches) {
+            if (!r.requestHandle.isFinished())
+                r.requestHandle.abandon();
+            std::ranges::for_each(r.eventIdsToRefresh, std::bind_front(&Room::updatedEvent, this));
+        }
+        return idMatches;
     });
 }
 
@@ -115,11 +118,16 @@ const RoomEvent* QuaternionRoom::getSingleEvent(const QString& eventId, const QS
             { eventId, connection()
                            ->callApi<GetOneRoomEventJob>(id(), eventId)
                            .then([this](RoomEventPtr&& pEvt) {
+                               if (pEvt == nullptr) {
+                                   qCCritical(MAIN, "/rooms/event returned an empty event");
+                                   return;
+                               }
                                const auto [it, cachedEventInserted] =
                                    cachedEvents.insert_or_assign(pEvt->id(), std::move(pEvt));
+                               const auto evtId = it->first;
                                if (QUO_ALARM(!cachedEventInserted))
-                                   emit updatedEvent(it->first); // At least notify clients...
-                               onGettingSingleEvent(it->first);
+                                   emit updatedEvent(evtId); // At least notify clients...
+                               onGettingSingleEvent(evtId);
                            }) });
     requestIt->eventIdsToRefresh.push_back(originEventId);
 
