@@ -11,6 +11,7 @@
 #include "mainwindow.h"
 
 #include <Quotient/networksettings.h>
+#include <Quotient/connection.h>
 
 #include <QtQuickControls2/QQuickStyle>
 #include <QtWidgets/QApplication>
