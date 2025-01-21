@@ -50,7 +50,6 @@ private:
     QLineEdit* passwordEdit;
     QLineEdit* initialDeviceName;
     QLineEdit* deviceId;
-    QCheckBox* enableEncryption;
     QLineEdit* serverEdit;
     QCheckBox* saveTokenCheck;
 

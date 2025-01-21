@@ -141,6 +141,7 @@ int main( int argc, char* argv[] )
     loadTranslations();
 
     Quotient::NetworkSettings().setupApplicationProxy();
+    Quotient::Connection::setEncryptionDefault(true);
 
     MainWindow window;
     if (parser.isSet(hideMainWindow)) {
