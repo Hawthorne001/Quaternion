@@ -318,7 +318,7 @@ Page {
                 scrollFinisher.scrollViewTo(index, ListView.Contain)
             }
             function onHistoryRequestChanged() {
-                scrollToReadMarkerButton.checked = controller.isHistoryRequestRunning
+                scrollToReadMarkerButton.checked = controller.isHistoryRequestRunning()
             }
         }
 
