@@ -1085,6 +1085,17 @@ void MainWindow::openResource(const QString& idOrUri, const QString& action)
             showLoginWindow(tr("Please connect to a server"));
             return;
         }
+        if (uri.type() == Uri::BareEventId) {
+            if (!currentRoom) {
+                QMessageBox::warning(
+                    this, tr("Bare event ids can't be resolved outside the room context"),
+                    tr("You have to be in a room that holds this event to open %1").arg(idOrUri),
+                    QMessageBox::Close, QMessageBox::Close);
+                return;
+            }
+            chatRoomWidget->timelineWidget()->spotlightEvent(uri.primaryId());
+            return;
+        }
         if (!action.isEmpty())
             uri.setAction(action);
 

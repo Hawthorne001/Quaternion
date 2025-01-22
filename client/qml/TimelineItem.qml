@@ -16,11 +16,6 @@ Item {
     readonly property bool pending: marks > EventStatus.Normal
                                     && marks < EventStatus.Redacted
     readonly property bool failed: marks === EventStatus.SendingFailed
-    readonly property string authorName: author?.displayName ?? ""
-    // FIXME: boilerplate with models/userlistmodel.cpp:115
-    readonly property string authorColor: // contrast but not too heavy
-        Qt.hsla(author?.hueF ?? 0, (1-palette.window.hslSaturation),
-                (-0.7*palette.window.hslLightness + 0.9), palette.buttonText.a)
 
     readonly property bool actionEvent: eventType === "state"
                                         || eventType === "emote"
@@ -73,6 +68,12 @@ Item {
         if (bottomEdgeShown)
             bottomEdgeShownChanged()
         readMarkerHereChanged()
+    }
+
+    // FIXME: boilerplate with models/userlistmodel.cpp:115
+    function memberColor(member) { // contrast but not too heavy
+        return Qt.hsla(member?.hueF ?? 0, (1-palette.window.hslSaturation),
+                (-0.7*palette.window.hslLightness + 0.9), palette.buttonText.a)
     }
 
     property bool showingDetails
@@ -250,12 +251,13 @@ Item {
                 horizontalAlignment: actionEvent ? Text.AlignRight : Text.AlignLeft
                 elide: Text.ElideRight
 
-                color: authorColor
+                color: memberColor(author)
                 textFormat: Label.PlainText
                 font.bold: !settings.timelineStyleIsXChat
                 renderType: settings.render_type
 
-                text: (actionEvent && settings.timelineStyleIsXChat ? "* " : "") + authorName
+                text:
+                    (actionEvent && settings.timelineStyleIsXChat ? "* " : "") + author?.displayName
 
                 AuthorInteractionArea { }
             }
@@ -313,6 +315,14 @@ Item {
                                   .replace(/</g, '&lt;').replace(/>/g, '&gt;')
                     }
 
+                    function inlineAuthorLabel(author) {
+                        return author
+                               ? "<a href='" + author.id + "' style='text-decoration:none;color:"
+                                 + memberColor(author) + ";font-weight:bold'>"
+                                 + author.htmlSafeDisplayName + "</a> "
+                               : ""
+                    }
+
                     selectByMouse: true
                     readOnly: true
                     textFormat: TextEdit.RichText
@@ -323,13 +333,19 @@ Item {
                               + "\"'><tr><td>" + (time ? toHtmlEscaped(time) : "")
                               + "</td></tr></table>"
                               + (actionEvent && !authorLabel.visible
-                                 ? ("<a href='" + (author?.id ?? "")
-                                    + "' style='text-decoration:none;color:\""
-                                    + authorColor + "\";font-weight:bold'>"
-                                    + toHtmlEscaped(authorName) + "</a> ")
-                                 : ""))
+                                 ? inlineAuthorLabel(author) : ""))
                            : "")
-                          + (actionEvent ? "<i>" + display + "</i>" : display)
+                          + (repliedTo
+                             ? "<table style='background-color:"
+                               + messageModel.fadedBackColor(memberColor(repliedTo.sender), 0.06)
+                               + "'><tr><td></td><td>" + inlineAuthorLabel(repliedTo.sender)
+                               + "</td></tr><tr><td><a href='" + repliedTo.eventId
+                               + "'><img src='qrc:///scrollup.svg' height=" + settings.fontHeight
+                               + "/></a></td><td>" + repliedTo.content + "</td></tr></table>"
+                             : "")
+                          + (actionEvent ? "<em>" : "")
+                          + display
+                          + (actionEvent ? "</em>" : "")
                           + (marks === EventStatus.Replaced
                              ? "<small style='color:\"" + settings.lowlight_color
                                + "\"'> (" + qsTr("edited") + ")</small>"
