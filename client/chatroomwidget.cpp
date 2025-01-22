@@ -661,8 +661,7 @@ QString ChatRoomWidget::sendCommand(QStringView command,
         // back to Matrix HTML to produce the (clean) rich text version
         // of the message
         const auto& [cleanQtHtml, errorPos, errorString] =
-            HtmlFilter::fromMatrixHtml(argString, currentRoom(),
-                                       HtmlFilter::Validate);
+            HtmlFilter::fromMatrixHtml(argString, { currentRoom() }, HtmlFilter::Validate);
         if (errorPos != -1)
             return tr("At pos %1: %2",
                       "%1 is a position of the error; %2 is the error message")
@@ -843,7 +842,8 @@ void ChatRoomWidget::dropEvent(QDropEvent* event)
 QString ChatRoomWidget::matrixHtmlFromMime(const QMimeData* data) const
 {
     QUO_CHECK(data->hasHtml());
-    const auto [cleanHtml, errorPos, errorString] = HtmlFilter::fromLocalHtml(data->html());
+    const auto [cleanHtml, errorPos, errorString] =
+        HtmlFilter::fromLocalHtml(data->html(), { currentRoom() });
     if (errorPos != -1) {
         qCWarning(MSGINPUT) << "HTML validation failed at position" << errorPos << "with error"
                             << errorString;

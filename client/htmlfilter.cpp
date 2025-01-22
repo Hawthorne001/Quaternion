@@ -1,7 +1,8 @@
 #include "htmlfilter.h"
 
 #include "logging_categories.h"
-#include "quaternionroom.h"
+
+#include <Quotient/room.h>
 
 #include <QtGui/QTextDocument>
 #include <QtGui/QFontDatabase>
@@ -25,18 +26,18 @@ enum Mode : unsigned char { QtToMatrix, MatrixToQt, GenericToQt };
 
 class Processor : public QXmlStreamEntityResolver {
 public:
-    [[nodiscard]] static Result process(QString html, Mode mode, QuaternionRoom* context,
+    [[nodiscard]] static Result process(QString html, Mode mode, const Context& context,
                                         Options options = Default);
 
 private:
     const Mode mode;
     const Options options;
-    QuaternionRoom* const context;
+    const Context& context;
     QXmlStreamWriter& writer;
     qsizetype errorPos = -1;
     QString errorString {};
 
-    Processor(Mode mode, Options options, QuaternionRoom* context, QXmlStreamWriter& writer)
+    Processor(Mode mode, Options options, const Context& context, QXmlStreamWriter& writer)
         : mode(mode), options(options), context(context), writer(writer)
     {}
     Q_DISABLE_COPY_MOVE(Processor)
@@ -296,8 +297,7 @@ inline auto rangeContains(const auto& c, const auto& v)
     return { html };
 }
 
-Result Processor::process(QString html, Mode mode, QuaternionRoom* context,
-                          Options options)
+Result Processor::process(QString html, Mode mode, const Context& context, Options options)
 {
     // Since Qt doesn't have an HTML parser (outside of QTextDocument; and
     // the one in QTextDocument is opinionated and not configurable)
@@ -664,14 +664,24 @@ Processor::rewrite_t Processor::filterTag(QStringView tag, QXmlStreamAttributes 
         }
 
         // Enrich mxc source URLs for images with the context so that NAM could resolve them
-        if (tag == u"img" && aName == u"src" && aValue.startsWith(u"mxc:"))
-            rewrite.front().second.push_back(
-                mode == MatrixToQt
-                    ? QXmlStreamAttribute(
-                          aName.toString(),
-                          context->makeMediaUrl({}, QUrl::fromUserInput(aValue.toString()))
-                              .toString(QUrl::FullyEncoded))
-                    : std::move(a));
+        if (tag == u"img" && aName == u"src" && aValue.startsWith(u"mxc:")) {
+            auto url = QUrl::fromUserInput(aValue.toString());
+            if (mode == QtToMatrix) {
+                // Make sure the mxc URL is just that, with no internal extras
+                QUrlQuery q{ url.query() };
+                for (auto k : { u"user_id"_s, u"room_id"_s, u"event_id"_s })
+                    q.removeAllQueryItems(k);
+                url.setQuery(q);
+                a = QXmlStreamAttribute(aName.toString(), url.toString(QUrl::FullyEncoded));
+            } else if (context.room) {
+                a = QXmlStreamAttribute(aName.toString(),
+                                        context.room
+                                            ->makeMediaUrl(context.eventId,
+                                                           QUrl::fromUserInput(aValue.toString()))
+                                            .toString(QUrl::FullyEncoded));
+            }
+            rewrite.front().second.push_back(std::move(a));
+        }
 
         // Generic filtering for attributes
         if ((mode == GenericToQt && (aName == htmlStyleAttr || aName == u"class" || aName == u"id"))
@@ -759,7 +769,7 @@ void Processor::filterText(QString& text)
 
 namespace HtmlFilter {
 
-QString toMatrixHtml(const QString& qtMarkup, QuaternionRoom* context, Options options)
+QString toMatrixHtml(const QString& qtMarkup, const Context& context, Options options)
 {
     // Validation of HTML emitted by Qt doesn't make much sense
     Q_ASSERT(!options.testFlag(Validate));
@@ -768,7 +778,7 @@ QString toMatrixHtml(const QString& qtMarkup, QuaternionRoom* context, Options o
     return result.filteredHtml;
 }
 
-Result fromMatrixHtml(const QString& matrixHtml, QuaternionRoom* context, Options options)
+Result fromMatrixHtml(const QString& matrixHtml, const Context& context, Options options)
 {
     // Matrix HTML body should never be treated as Markdown
     Q_ASSERT(!options.testFlag(ConvertMarkdown));
@@ -781,7 +791,7 @@ Result fromMatrixHtml(const QString& matrixHtml, QuaternionRoom* context, Option
     return result;
 }
 
-Result fromLocalHtml(const QString& html, QuaternionRoom* context, Options options)
+Result fromLocalHtml(const QString& html, const Context& context, Options options)
 {
     return Processor::process(html, GenericToQt, context, options);
 }
