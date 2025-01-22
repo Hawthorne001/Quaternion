@@ -264,7 +264,7 @@ void QuaternionRoom::sendMessage(const QTextDocumentFragment& richText,
                                  HtmlFilter::Options htmlFilterOptions)
 {
     const auto& plainText = richText.toPlainText();
-    const auto& html = HtmlFilter::toMatrixHtml(richText.toHtml(), this, htmlFilterOptions);
+    const auto& html = HtmlFilter::toMatrixHtml(richText.toHtml(), { this }, htmlFilterOptions);
     Q_ASSERT(!plainText.isEmpty());
     // Send plain text if htmlText has no markup or just <br/> elements
     // (those are easily represented as line breaks in plain text)
