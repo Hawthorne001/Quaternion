@@ -2,8 +2,7 @@
 
 #include <Quotient/util.h>
 
-#include <QtCore/QMetaType> // For Q_NAMESPACE and Q_DECLARE_METATYPE
-#include <QtCore/QString>
+// #include <QtCore/QMetaType> // For Q_NAMESPACE and Q_DECLARE_METATYPE
 
 namespace Quotient {
 class Room;

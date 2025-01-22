@@ -7,11 +7,8 @@
 #include <QtGui/QTextDocument>
 #include <QtGui/QFontDatabase>
 
-#include <QtCore/QRegularExpression>
 #include <QtCore/QXmlStreamReader>
 #include <QtCore/QXmlStreamWriter>
-#include <QtCore/QStringBuilder>
-#include <QtCore/QDebug>
 
 #include <ranges>
 #include <stack>
