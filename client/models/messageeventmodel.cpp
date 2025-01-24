@@ -738,8 +738,10 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
                 return QVariant::fromValue<EventForQml>(
                     { replyEventId, m_currentRoom->member(repliedToEvent->senderId()),
                       visualiseEvent(*repliedToEvent, true) });
-            return QVariant::fromValue<EventForQml>(
-                { replyEventId, {}, QVariant::fromValue(tr("(loading)")) });
+            //: The line to show instead of the replied-to event content while getting it
+            //: from the homeserver
+            return QVariant::fromValue<EventForQml>({ replyEventId, {}, QVariant::fromValue(tr("(loading)")) });
+
         });
     }
 
