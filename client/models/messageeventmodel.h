@@ -73,18 +73,18 @@ private:
 
     void refreshLastUserEvents(int baseTimelineRow);
     void refreshEventRoles(int row, const QVector<int>& roles = {});
-    QVariant visualiseEvent(const Quotient::RoomEvent& evt, bool abbreviate = false) const;
+    QString visualiseEvent(const Quotient::RoomEvent& evt, bool abbreviate = false) const;
 };
 
 struct EventForQml {
     Quotient::EventId eventId;
     Quotient::RoomMember sender;
-    QVariant content;
+    QString content;
 
     Q_GADGET
     Q_PROPERTY(Quotient::EventId eventId MEMBER eventId FINAL)
     Q_PROPERTY(Quotient::RoomMember sender MEMBER sender FINAL)
-    Q_PROPERTY(QVariant content MEMBER content FINAL)
+    Q_PROPERTY(QString content MEMBER content FINAL)
 };
 
 namespace EventGrouping {

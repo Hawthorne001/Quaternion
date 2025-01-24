@@ -449,7 +449,7 @@ QColor MessageEventModel::fadedBackColor(QColor unfadedColor,
                      unfadedColor, fadeRatio);
 }
 
-QVariant MessageEventModel::visualiseEvent(const Quotient::RoomEvent& evt, bool abbreviate) const
+QString MessageEventModel::visualiseEvent(const Quotient::RoomEvent& evt, bool abbreviate) const
 {
     if (evt.isRedacted()) {
         auto reason = evt.redactedBecause()->reason();
@@ -740,7 +740,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
                       visualiseEvent(*repliedToEvent, true) });
             //: The line to show instead of the replied-to event content while getting it
             //: from the homeserver
-            return QVariant::fromValue<EventForQml>({ replyEventId, {}, QVariant::fromValue(tr("(loading)")) });
+            return QVariant::fromValue<EventForQml>({ replyEventId, {}, tr("(loading)") });
 
         });
     }
