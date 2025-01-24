@@ -70,7 +70,8 @@ around (e.g., it is a part of any Qt development installation), you should
 install it yourself.
 [OpenSSL's Wiki](https://wiki.openssl.org/index.php/Binaries) lists a few links
 to OpenSSL installers. They come in different build configurations; current
-Quaternion builds need OpenSSL 3.x made with/for Visual Studio (not MinGW).
+Quaternion builds distributed from GitHub Releases need OpenSSL 3.x made
+with/for Visual Studio (not MinGW).
 
 ### macOS
 If you use Homebrew (you should!), `brew install quaternion` installs Quaternion
@@ -294,11 +295,14 @@ Quaternion uses libQuotient under the hood; some Quaternion problems are
 actually problems of libQuotient. If you haven't found your case below, check
 also the troubleshooting section in libQuotient README.md.
 
-#### Older messages don't get decrypted in E2EE rooms
-Unfortunately, this is a limitation in the current libQuotient code: it doesn't
-request older keys and therefore cannot decrypt older messages. Check
-[issue 608](https://github.com/quotient-im/libQuotient/issues/608) for
-the progress on this.
+#### Some older messages don't get decrypted in E2EE rooms
+Unfortunately, this is a limitation in the libQuotient code. The E2EE backend
+of libQuotient is currently being ported from Olm to matrix-rust-sdk - it is
+anticipated that matrix-rust-sdk will provide all necessary bits and pieces
+to decrypt older messages in a more comprehensive way (aside from being maintained,
+unlike Olm). Subscribe to
+[the respective pull request](https://github.com/quotient-im/libQuotient/pull/820)
+if you want to be updated on the progress of this work.
 
 #### No messages in the timeline
 If Quaternion runs but you can't see any messages in the chat (though you can
@@ -359,7 +363,7 @@ while logging categories for libQuotient always start with `quotient`.
 
 You can use `*` (asterisk) as a wildcard for any part between two dots, and
 a semicolon is used for a separator. Latter statements override former ones, so
-if you want to switch on all debug logs except `timeline.qml` you can set
+if you want Quaternion to log at debug level except, e.g., `timeline.qml`, set
 ```shell script
 QT_LOGGING_RULES="quaternion.*.debug=true;quaternion.timeline.qml.debug=false"
 ```
@@ -374,5 +378,7 @@ follows:
 (the scary `%{if}`s are just encoding the logging level into its initial letter).
 
 ## Screenshot
+<!-- TO BE UPDATED
 ![Screenshot1](Screenshot1.png)
 ![Screenshot2](Screenshot2.png)
+-->

@@ -62,8 +62,8 @@ using the old name.)
 ### Pre-requisites
 - a recent Linux, macOS or Windows system (desktop versions tried; mobile
   platforms might work too but never tried)
-  - Recent enough Linux examples: Debian Bookworm; Fedora 36 or CentOS Stream 9;
-    OpenSUSE Leap 15.4; Ubuntu Jammy Jellyfish.
+  - Recent enough Linux examples: Debian Bookworm; Fedora 39 or CentOS Stream 9;
+    OpenSUSE Leap 15.6; Ubuntu 24.04 (noble)
 - Qt 6.4 or newer (either Open Source or Commercial)
 - CMake 3.16 or newer (from your package management system or
   [the official website](https://cmake.org/download/))
@@ -72,8 +72,8 @@ using the old name.)
     and Visual Studio 2022 (Windows) are the oldest officially supported.
 - Any build system that works with CMake should be fine:
   GNU Make, ninja (any platform), NMake, jom (Windows) are known to work.
-- optionally, libQuotient 0.9.x development files (from your package management
-  system), or prebuilt libQuotient (see "Getting the source code" above);
+- optionally, development files for libQuotient 0.9.2 or newer (from your package 
+  management system), or prebuilt libQuotient (see "Getting the source code" above);
   libQuotient 0.8.x is _not_ compatible with any Quaternion 0.0.97 release.
 - libQuotient dependendencies (see lib/README.md):
   - [Qt Keychain](https://github.com/frankosterfeld/qtkeychain)
@@ -169,9 +169,10 @@ Whenever you want to update your Quaternion package, do the following from the f
 flatpak --user update
 ```
 
-Be mindful that since Quaternion 0.0.97 beta the Flatpak app-id has changed (it used to be
-`com.github.quaternion`). Normally, Flatpak should seamlessly handle an upgrade; if it doesn't,
-send us an issue.
+Be mindful that since Quaternion 0.0.97 beta the Flatpak app-id has changed: it used to be
+`com.github.quaternion`, now it's `io.github.quotient_im.quaternion`, to align with
+[Flathub verification rules](https://docs.flathub.org/docs/for-app-authors/verification/).
+Normally, Flatpak should seamlessly handle an upgrade; if it doesn't, send us an issue.
 
 ## Troubleshooting
 
