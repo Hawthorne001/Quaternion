@@ -54,7 +54,7 @@
           <li>New login dialog</li>
           <li>Fix: actually log out accounts on exit that are not set to stay logged in</li>
           <li>Regression fix: message text again uses the font configured for the timeline</li>
-          <li>Other code cleanup, performance tweaks and smaller fixes
+          <li>Other code cleanup, performance tweaks and smaller fixes</li>
         </ul>
       </description>
     </release>
