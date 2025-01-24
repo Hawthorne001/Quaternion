@@ -734,14 +734,17 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
             const auto& replyEventId = e.replyEventId(TurnThreadsToReplies);
             if (replyEventId.isEmpty())
                 return QVariant(); // The current event is not a reply
-            if (const auto* repliedToEvent = m_currentRoom->getSingleEvent(replyEventId, e.id()))
-                return QVariant::fromValue<EventForQml>(
-                    { replyEventId, m_currentRoom->member(repliedToEvent->senderId()),
-                      visualiseEvent(*repliedToEvent, true) });
-            //: The line to show instead of the replied-to event content while getting it
-            //: from the homeserver
-            return QVariant::fromValue<EventForQml>({ replyEventId, {}, tr("(loading)") });
-
+            const auto* repliedToEvent = m_currentRoom->getSingleEvent(replyEventId, e.id());
+            const auto result =
+                repliedToEvent
+                    ? EventForQml{ replyEventId, m_currentRoom->member(repliedToEvent->senderId()),
+                                   visualiseEvent(*repliedToEvent, true) }
+                    : EventForQml{ replyEventId,
+                                   {},
+                                   //: The line to show instead of the replied-to event content
+                                   //: while getting it from the homeserver
+                                   tr("(loading)") };
+            return QVariant::fromValue(result);
         });
     }
 
