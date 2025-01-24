@@ -4,7 +4,7 @@ cmake_policy(SET CMP0092 NEW)
 endif()
 
 set(IDENTIFIER "io.github.quotient_im.Quaternion")
-set(COPYRIGHT "Copyright © 2015-2024 The Quaternion contributors")
+set(COPYRIGHT "Copyright © The Quotient Project contributors")
 
 project(quaternion VERSION 0.0.96.82 LANGUAGES CXX)
 
