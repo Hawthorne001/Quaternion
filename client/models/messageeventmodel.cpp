@@ -32,26 +32,27 @@
 QHash<int, QByteArray> MessageEventModel::roleNames() const
 {
     static const auto roles = [this] {
-        auto roles = QAbstractItemModel::roleNames();
+        auto rolesInit = QAbstractItemModel::roleNames();
         // Not every Qt standard role has a role name, turns out
-        roles.insert(Qt::ForegroundRole, "foreground");
-        roles.insert(EventTypeRole, "eventType");
-        roles.insert(EventIdRole, "eventId");
-        roles.insert(DateTimeRole, "dateTime");
-        roles.insert(DateRole, "date");
-        roles.insert(EventGroupingRole, "eventGrouping");
-        roles.insert(AuthorRole, "author");
-        roles.insert(AuthorHasAvatarRole, "authorHasAvatar");
-        roles.insert(ContentRole, "content");
-        roles.insert(ContentTypeRole, "contentType");
-        roles.insert(HighlightRole, "highlight");
-        roles.insert(SpecialMarksRole, "marks");
-        roles.insert(LongOperationRole, "progressInfo");
-        roles.insert(AnnotationRole, "annotation");
-        roles.insert(EventClassNameRole, "eventClassName");
-        roles.insert(RefRole, "refId");
-        roles.insert(ReactionsRole, "reactions");
-        return roles;
+        rolesInit.insert(Qt::ForegroundRole, "foreground");
+        rolesInit.insert(EventTypeRole, "eventType");
+        rolesInit.insert(EventIdRole, "eventId");
+        rolesInit.insert(DateTimeRole, "dateTime");
+        rolesInit.insert(DateRole, "date");
+        rolesInit.insert(EventGroupingRole, "eventGrouping");
+        rolesInit.insert(AuthorRole, "author");
+        rolesInit.insert(AuthorHasAvatarRole, "authorHasAvatar");
+        rolesInit.insert(ContentRole, "content");
+        rolesInit.insert(ContentTypeRole, "contentType");
+        rolesInit.insert(RepliedToRole, "repliedTo");
+        rolesInit.insert(HighlightRole, "highlight");
+        rolesInit.insert(SpecialMarksRole, "marks");
+        rolesInit.insert(LongOperationRole, "progressInfo");
+        rolesInit.insert(AnnotationRole, "annotation");
+        rolesInit.insert(EventClassNameRole, "eventClassName");
+        rolesInit.insert(RefRole, "refId");
+        rolesInit.insert(ReactionsRole, "reactions");
+        return rolesInit;
     }();
     return roles;
 }
@@ -61,6 +62,7 @@ MessageEventModel::MessageEventModel(QObject* parent)
 {
     using namespace Quotient;
     qmlRegisterAnonymousType<FileTransferInfo>("Quotient", 1);
+    qmlRegisterAnonymousType<EventForQml>("Quotient", 1);
     qmlRegisterUncreatableMetaObject(EventStatus::staticMetaObject,
                                      "Quotient", 1, 0, "EventStatus",
                                      "Access to EventStatus enums only");
@@ -75,8 +77,7 @@ MessageEventModel::MessageEventModel(QObject* parent)
     // parent's signals with parameters in NOTIFY
     // NB: this makes all roomChanged connections order before modelReset
     // connections
-    connect(this, &MessageEventModel::modelReset, //
-            this, &MessageEventModel::roomChanged);
+    connect(this, &MessageEventModel::modelReset, this, &MessageEventModel::roomChanged);
 }
 
 QuaternionRoom* MessageEventModel::room() const { return m_currentRoom; }
@@ -180,10 +181,10 @@ void MessageEventModel::changeRoom(QuaternionRoom* room)
                 this, &MessageEventModel::refreshEvent);
         qCDebug(EVENTMODEL)
             << "Event model connected to room" << room->objectName() //
-            << "as" << room->localUser()->id();
+            << "as" << room->localMember().id();
         // If the timeline isn't loaded, ask for at least something right away
         if (room->timelineSize() == 0)
-            room->getHistory(30);
+            room->getPreviousContent(30);
     }
     endResetModel();
     emit readMarkerUpdated();
@@ -258,9 +259,15 @@ int MessageEventModel::findRow(const QString& id, bool includePending) const
     return -1;
 }
 
-inline bool hasValidTimestamp(const Quotient::TimelineItem& ti)
+namespace {
+inline std::optional<QDateTime> getTimestamp(auto from, auto to)
 {
-    return ti->originTimestamp().isValid();
+    for (const auto& ti : std::ranges::subrange(from, to))
+        if (auto ts = ti->originTimestamp(); ts.isValid())
+            return ts.date().startOfDay();
+
+    return std::nullopt;
+}
 }
 
 QDateTime MessageEventModel::makeMessageTimestamp(
@@ -272,12 +279,11 @@ QDateTime MessageEventModel::makeMessageTimestamp(
 
     // The event is most likely redacted or just invalid.
     // Look for the nearest date around and slap zero time to it.
-    if (auto rit = std::find_if(baseIt, timeline.rend(), hasValidTimestamp);
-            rit != timeline.rend())
-        return { rit->event()->originTimestamp().date(), {0,0}, Qt::LocalTime };
-    if (auto it = std::find_if(baseIt.base(), timeline.end(), hasValidTimestamp);
-            it != timeline.end())
-        return { it->event()->originTimestamp().date(), {0,0}, Qt::LocalTime };
+    if (auto closestPastTs = getTimestamp(baseIt, timeline.rend()))
+        return *closestPastTs;
+
+    if (auto closestFutureTs = getTimestamp(baseIt.base(), timeline.end()))
+        return *closestFutureTs;
 
     // What kind of room is that?..
     qCCritical(EVENTMODEL) << "No valid timestamps in the room timeline!";
@@ -443,6 +449,157 @@ QColor MessageEventModel::fadedBackColor(QColor unfadedColor,
                      unfadedColor, fadeRatio);
 }
 
+QString MessageEventModel::visualiseEvent(const Quotient::RoomEvent& evt, bool abbreviate) const
+{
+    if (evt.isRedacted()) {
+        auto reason = evt.redactedBecause()->reason();
+        if (reason.isEmpty())
+            return tr("Redacted");
+
+        return tr("Redacted: %1").arg(reason.toHtmlEscaped());
+    }
+
+    using namespace Quotient;
+    static Settings settings;
+    return evt.switchOnType(
+        [this](const RoomMessageEvent& e) {
+            using namespace Quotient::EventContent;
+
+            if (e.has<TextContent>() && e.mimeType().name() != "text/plain") {
+                // Naïvely assume that it's HTML
+                auto htmlBody = e.get<TextContent>()->body;
+                auto [cleanHtml, errorPos, errorString] =
+                    HtmlFilter::fromMatrixHtml(htmlBody, { m_currentRoom, e.id() },
+                                               HtmlFilter::StripMxReply);
+                // If HTML is bad (or it's not HTML at all), fall back
+                // to returning the prettified plain text
+                if (errorPos != -1) {
+                    cleanHtml = m_currentRoom->prettyPrint(e.plainBody());
+                    // A manhole to visualise HTML errors
+                    if (settings.get<bool>("Debug/html"))
+                        cleanHtml += QStringLiteral("<br /><font color=\"red\">"
+                                                    "At pos %1: %2</font>")
+                                         .arg(QString::number(errorPos), errorString);
+                }
+                return cleanHtml;
+            }
+            if (const auto fileContent = e.get<FileContentBase>()) {
+                auto fileCaption = fileContent->commonInfo().originalName.toHtmlEscaped();
+                if (fileCaption.isEmpty())
+                    fileCaption = m_currentRoom->prettyPrint(e.plainBody());
+                return !fileCaption.isEmpty() ? fileCaption : tr("a file");
+            }
+            return m_currentRoom->prettyPrint(e.plainBody());
+        },
+        [this](const RoomMemberEvent& e) {
+            // FIXME: Rewind to the name that was at the time of this event
+            const auto subjectName = m_currentRoom->member(e.userId()).htmlSafeDisambiguatedName();
+            // The below code assumes senderName output in AuthorRole
+            switch (e.membership()) {
+            case Membership::Invite:
+            case Membership::Join: {
+                QString text{};
+                // Part 1: invites and joins
+                if (e.membership() == Membership::Invite)
+                    text = tr("invited %1 to the room").arg(subjectName);
+                else if (e.changesMembership())
+                    text = tr("joined the room");
+
+                if (!text.isEmpty()) {
+                    if (e.repeatsState())
+                        text += ' '
+                                //: State event that doesn't change the state
+                                % tr("(repeated)");
+                    if (!e.reason().isEmpty())
+                        text += ": " + e.reason().toHtmlEscaped();
+                    return text;
+                }
+
+                // Part 2: profile changes of joined members
+                if (e.isRename() && settings.get("UI/show_rename", true)) {
+                    const auto& newDisplayName = e.newDisplayName().value_or(QString());
+                    if (newDisplayName.isEmpty())
+                        text = tr("cleared the display name");
+                    else
+                        text =
+                            tr("changed the display name to %1").arg(newDisplayName.toHtmlEscaped());
+                }
+                if (e.isAvatarUpdate() && settings.get("UI/show_avatar_update", true)) {
+                    if (!text.isEmpty())
+                        //: Joiner for member profile updates;
+                        //: mind the leading and trailing spaces!
+                        text += tr(" and ");
+                    text += !e.newAvatarUrl() || e.newAvatarUrl()->isEmpty()
+                                ? tr("cleared the avatar")
+                                : tr("updated the avatar");
+                }
+                return text;
+            }
+            case Membership::Leave:
+                if (e.prevContent() && e.prevContent()->membership == Membership::Invite) {
+                    return (e.senderId() != e.userId())
+                               ? tr("withdrew %1's invitation").arg(subjectName)
+                               : tr("rejected the invitation");
+                }
+
+                if (e.prevContent() && e.prevContent()->membership == Membership::Ban) {
+                    return (e.senderId() != e.userId()) ? tr("unbanned %1").arg(subjectName)
+                                                        : tr("self-unbanned");
+                }
+                return (e.senderId() != e.userId())
+                           ? e.reason().isEmpty()
+                                 ? tr("kicked %1 from the room").arg(subjectName)
+                                 : tr("kicked %1 from the room: %2")
+                                       .arg(subjectName, e.reason().toHtmlEscaped())
+                           : tr("left the room");
+            case Membership::Ban:
+                return (e.senderId() != e.userId())
+                           ? e.reason().isEmpty()
+                                 ? tr("banned %1 from the room").arg(subjectName)
+                                 : tr("banned %1 from the room: %2")
+                                       .arg(subjectName, e.reason().toHtmlEscaped())
+                           : tr("self-banned from the room");
+            case Membership::Knock: return tr("knocked");
+            default:;
+            }
+            return tr("made something unknown");
+        },
+        [](const RoomCanonicalAliasEvent& e) {
+            return (e.alias().isEmpty()) ? tr("cleared the room main alias")
+                                         : tr("set the room main alias to: %1").arg(e.alias());
+        },
+        [](const RoomNameEvent& e) {
+            return (e.name().isEmpty())
+                       ? tr("cleared the room name")
+                       : tr("set the room name to: %1").arg(e.name().toHtmlEscaped());
+        },
+        [this](const RoomTopicEvent& e) {
+            return (e.topic().isEmpty())
+                       ? tr("cleared the topic")
+                       : tr("set the topic to: %1").arg(m_currentRoom->prettyPrint(e.topic()));
+        },
+        [](const RoomAvatarEvent&) { return tr("changed the room avatar"); },
+        [](const EncryptionEvent&) { return tr("activated End-to-End Encryption"); },
+        [](const RoomCreateEvent& e) {
+            return (e.isUpgrade() ? tr("upgraded the room to version %1")
+                                  : tr("created the room, version %1"))
+                .arg(e.version().isEmpty() ? "1" : e.version().toHtmlEscaped());
+        },
+        [](const RoomTombstoneEvent& e) {
+            return tr("upgraded the room: %1").arg(e.serverMessage().toHtmlEscaped());
+        },
+        [](const StateEvent& e) {
+            // A small hack for state events from TWIM bot
+            return e.stateKey() == "twim"
+                       ? tr("updated the database", "TWIM bot updated the database")
+                   : e.stateKey().isEmpty()
+                       ? tr("updated %1 state", "%1 - Matrix event type").arg(e.matrixType())
+                       : tr("updated %1 state for %2", "%1 - Matrix event type, %2 - state key")
+                             .arg(e.matrixType(), e.stateKey().toHtmlEscaped());
+        },
+        tr("Unknown event"));
+}
+
 QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
 {
     const auto row = idx.row();
@@ -459,192 +616,8 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
 
     using namespace Quotient;
     static Settings settings;
-    if (role == Qt::DisplayRole) {
-        if (evt.isRedacted()) {
-            auto reason = evt.redactedBecause()->reason();
-            if (reason.isEmpty())
-                return tr("Redacted");
-
-            return tr("Redacted: %1").arg(reason.toHtmlEscaped());
-        }
-
-        // clang-format off
-        return switchOnType(evt
-            , [this] (const RoomMessageEvent& e) {
-                // clang-format on
-                using namespace MessageEventContent;
-
-                if (e.hasTextContent() && e.mimeType().name() != "text/plain") {
-                    // Naïvely assume that it's HTML
-                    auto htmlBody =
-                        static_cast<const TextContent*>(e.content())->body;
-                    auto [cleanHtml, errorPos, errorString] =
-                        HtmlFilter::fromMatrixHtml(htmlBody, m_currentRoom);
-                    // If HTML is bad (or it's not HTML at all), fall back
-                    // to returning the prettified plain text
-                    if (errorPos != -1) {
-                        cleanHtml = m_currentRoom->prettyPrint(e.plainBody());
-                        // A manhole to visualise HTML errors
-                        if (settings.get<bool>("Debug/html"))
-                            cleanHtml +=
-                                QStringLiteral("<br /><font color=\"red\">"
-                                               "At pos %1: %2</font>")
-                                    .arg(QString::number(errorPos), errorString);
-                    }
-                    return cleanHtml;
-                }
-                if (e.hasFileContent()) {
-                    auto fileCaption =
-                        e.content()->fileInfo()->originalName.toHtmlEscaped();
-                    if (fileCaption.isEmpty())
-                        fileCaption = m_currentRoom->prettyPrint(e.plainBody());
-                    return !fileCaption.isEmpty() ? fileCaption : tr("a file");
-                }
-                return m_currentRoom->prettyPrint(e.plainBody());
-                // clang-format off
-            }
-            , [this] (const RoomMemberEvent& e) {
-                // clang-format on
-                // FIXME: Rewind to the name that was at the time of this event
-                const auto subjectName =
-                    m_currentRoom->safeMemberName(e.userId()).toHtmlEscaped();
-                // The below code assumes senderName output in AuthorRole
-                switch( e.membership() )
-                {
-                    case Membership::Invite:
-                    case Membership::Join: {
-                        QString text {};
-                        // Part 1: invites and joins
-                        if (e.membership() == Membership::Invite)
-                            text = tr("invited %1 to the room")
-                                   .arg(subjectName);
-                        else if (e.changesMembership())
-                            text = tr("joined the room");
-
-                        if (!text.isEmpty()) {
-                            if (e.repeatsState())
-                                text += ' '
-                                    //: State event that doesn't change the state
-                                    % tr("(repeated)");
-                            if (!e.reason().isEmpty())
-                                text += ": " + e.reason().toHtmlEscaped();
-                            return text;
-                        }
-
-                        // Part 2: profile changes of joined members
-                        if (e.isRename()
-                            && settings.get("UI/show_rename", true)) {
-                            const auto& newDisplayName =
-                                e.newDisplayName().value_or(QString());
-                            if (newDisplayName.isEmpty())
-                                text = tr("cleared the display name");
-                            else
-                                text = tr("changed the display name to %1")
-                                           .arg(newDisplayName.toHtmlEscaped());
-                        }
-                        if (e.isAvatarUpdate()
-                            && settings.get("UI/show_avatar_update", true)) {
-                            if (!text.isEmpty())
-                                //: Joiner for member profile updates;
-                                //: mind the leading and trailing spaces!
-                                text += tr(" and ");
-                            text += !e.newAvatarUrl()
-                                            || e.newAvatarUrl()->isEmpty()
-                                        ? tr("cleared the avatar")
-                                        : tr("updated the avatar");
-                        }
-                        return text;
-                    }
-                    case Membership::Leave:
-                        if (e.prevContent() &&
-                            e.prevContent()->membership == Membership::Invite)
-                        {
-                            return (e.senderId() != e.userId())
-                                    ? tr("withdrew %1's invitation").arg(subjectName)
-                                    : tr("rejected the invitation");
-                        }
-
-                        if (e.prevContent() &&
-                                e.prevContent()->membership == Membership::Ban)
-                        {
-                            return (e.senderId() != e.userId())
-                                    ? tr("unbanned %1").arg(subjectName)
-                                    : tr("self-unbanned");
-                        }
-                        return (e.senderId() != e.userId())
-                                ? e.reason().isEmpty()
-                                  ? tr("kicked %1 from the room")
-                                    .arg(subjectName)
-                                  : tr("kicked %1 from the room: %2")
-                                    .arg(subjectName,
-                                         e.reason().toHtmlEscaped())
-                                : tr("left the room");
-                    case Membership::Ban:
-                        return (e.senderId() != e.userId())
-                                ? e.reason().isEmpty()
-                                  ? tr("banned %1 from the room")
-                                    .arg(subjectName)
-                                  : tr("banned %1 from the room: %2")
-                                    .arg(subjectName,
-                                         e.reason().toHtmlEscaped())
-                                : tr("self-banned from the room");
-                    case Membership::Knock:
-                        return tr("knocked");
-                    default:
-                        ;
-                }
-                return tr("made something unknown");
-                // clang-format off
-            }
-            , [] (const RoomCanonicalAliasEvent& e) {
-                return (e.alias().isEmpty())
-                        ? tr("cleared the room main alias")
-                        : tr("set the room main alias to: %1").arg(e.alias());
-            }
-            , [] (const RoomNameEvent& e) {
-                return (e.name().isEmpty())
-                        ? tr("cleared the room name")
-                        : tr("set the room name to: %1")
-                          .arg(e.name().toHtmlEscaped());
-            }
-            , [this] (const RoomTopicEvent& e) {
-                return (e.topic().isEmpty())
-                        ? tr("cleared the topic")
-                        : tr("set the topic to: %1")
-                          .arg(m_currentRoom->prettyPrint(e.topic()));
-            }
-            , [] (const RoomAvatarEvent&) {
-                return tr("changed the room avatar");
-            }
-            , [] (const EncryptionEvent&) {
-                return tr("activated End-to-End Encryption");
-            }
-            , [] (const RoomCreateEvent& e) {
-                return (e.isUpgrade()
-                        ? tr("upgraded the room to version %1")
-                        : tr("created the room, version %1")
-                       ).arg(e.version().isEmpty()
-                             ? "1" : e.version().toHtmlEscaped());
-            }
-            , [] (const RoomTombstoneEvent& e) {
-                return tr("upgraded the room: %1")
-                       .arg(e.serverMessage().toHtmlEscaped());
-            }
-            , [] (const StateEvent& e) {
-                // A small hack for state events from TWIM bot
-                return e.stateKey() == "twim"
-                    ? tr("updated the database", "TWIM bot updated the database")
-                    : e.stateKey().isEmpty()
-                    ? tr("updated %1 state", "%1 - Matrix event type")
-                      .arg(e.matrixType())
-                    : tr("updated %1 state for %2",
-                         "%1 - Matrix event type, %2 - state key")
-                      .arg(e.matrixType(), e.stateKey().toHtmlEscaped());
-            }
-            , tr("Unknown event")
-        );
-        // clang-format on
-    }
+    if (role == Qt::DisplayRole)
+        return visualiseEvent(evt);
 
     if (role == Qt::ForegroundRole) {
         using CG = QPalette::ColorGroup;
@@ -671,7 +644,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
             return settings.get(QStringLiteral("UI/highlight_color"),
                                 QStringLiteral("orange"));
 
-        if (isPending || evt.senderId() == m_currentRoom->localUser()->id())
+        if (isPending || evt.senderId() == m_currentRoom->localMember().id())
             normalTextColor = mixColors(normalTextColor,
                             settings.get(QStringLiteral("UI/outgoing_color"),
                                          QStringLiteral("#4A8780")), 0.5);
@@ -700,7 +673,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
                 case MessageEventType::Image:
                     return "image";
                 default:
-                    return e->hasFileContent() ? "file" : "message";
+                    return e->has<EventContent::FileContentBase>() ? "file" : "message";
             }
         }
         if (evt.isStateEvent())
@@ -714,14 +687,13 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
 
     if( role == AuthorRole )
     {
-        // FIXME: It shouldn't be User, it should be its state "as of event"
-        return QVariant::fromValue(isPending
-                                   ? m_currentRoom->localUser()
-                                   : m_currentRoom->user(evt.senderId()));
+        // TODO: It should be RoomMember state "as of event", not "as of now"
+        return QVariant::fromValue(isPending ? m_currentRoom->localMember()
+                                             : m_currentRoom->member(evt.senderId()));
     }
 
     if (role == AuthorHasAvatarRole) {
-        return m_currentRoom->memberAvatarUrl(evt.senderId()).isValid();
+        return m_currentRoom->member(evt.senderId()).avatarUrl().isValid();
     }
 
     if (role == ContentTypeRole)
@@ -750,10 +722,30 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
             // Cannot use e.contentJson() here because some
             // EventContent classes inject values into the copy of the
             // content JSON stored in EventContent::Base
-            return e->hasFileContent()
+            return e->has<EventContent::FileContentBase>()
                     ? QVariant::fromValue(e->content()->originalJson)
                     : QVariant();
         }
+    }
+
+    if (role == RepliedToRole) {
+        return evt.switchOnType([this](const RoomMessageEvent& e) {
+            constexpr auto TurnThreadsToReplies = true;
+            const auto& replyEventId = e.replyEventId(TurnThreadsToReplies);
+            if (replyEventId.isEmpty())
+                return QVariant(); // The current event is not a reply
+            const auto* repliedToEvent = m_currentRoom->getSingleEvent(replyEventId, e.id());
+            const auto result =
+                repliedToEvent
+                    ? EventForQml{ replyEventId, m_currentRoom->member(repliedToEvent->senderId()),
+                                   visualiseEvent(*repliedToEvent, true) }
+                    : EventForQml{ replyEventId,
+                                   {},
+                                   //: The line to show instead of the replied-to event content
+                                   //: while getting it from the homeserver
+                                   tr("(loading)") };
+            return QVariant::fromValue(result);
+        });
     }
 
     if( role == HighlightRole )
@@ -809,8 +801,8 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
             }
         }
         if (memberEvent || evt.isRedacted()) {
-            if (evt.senderId() != m_currentRoom->localUser()->id()
-                && evt.stateKey() != m_currentRoom->localUser()->id()
+            if (evt.senderId() != m_currentRoom->localMember().id()
+                && evt.stateKey() != m_currentRoom->localMember().id()
                 && !settings.get<bool>("UI/show_spammy")) {
 //                QElapsedTimer et; et.start();
                 auto hide = !isUserActivityNotable(timelineIt);
@@ -842,7 +834,7 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
     if( role == LongOperationRole )
     {
         if (auto e = eventCast<const RoomMessageEvent>(&evt))
-            if (e->hasFileContent())
+            if (e->has<EventContent::FileContentBase>())
                 return QVariant::fromValue(
                             m_currentRoom->fileTransferInfo(
                                 isPending ? e->transactionId() : e->id()));
@@ -863,17 +855,14 @@ QVariant MessageEventModel::data(const QModelIndex& idx, int role) const
         const auto& annotations =
             m_currentRoom->relatedEvents(evt, EventRelation::AnnotationType);
         for (const auto& a: annotations)
-            if (const auto e = eventCast<const ReactionEvent>(a)) {
-                auto rIt = std::find_if(reactions.begin(), reactions.end(),
-                                        [&e] (const Reaction& r) {
-                                            return r.key == e->key();
-                                       });
+            if (const auto *const e = eventCast<const ReactionEvent>(a)) {
+                auto rIt = std::ranges::find(reactions, e->key(), &Reaction::key);
                 if (rIt == reactions.end())
                     rIt = reactions.insert(reactions.end(), { e->key() });
 
-                rIt->authorsList << m_currentRoom->safeMemberName(e->senderId());
+                rIt->authorsList << m_currentRoom->member(e->senderId()).displayName();
                 rIt->includesLocalUser |=
-                        e->senderId() == m_currentRoom->localUser()->id();
+                        e->senderId() == m_currentRoom->localMember().id();
             }
         // Prepare the QML model data
         // NB: Strings are NOT HTML-escaped; QML code must take care to use

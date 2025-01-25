@@ -5,7 +5,7 @@ import Quotient 1.0
 Page {
     id: root
 
-    property var room: messageModel ? messageModel.room : undefined
+    property Room room: messageModel?.room
 
     readonly property Logger lc: Logger { }
     TimelineSettings {
@@ -50,9 +50,8 @@ Page {
             height: headerText.height
             // implicitWidth on its own doesn't respect the scale down of
             // the received image (that almost always happens)
-            width: Math.min(implicitHeight > 0
-                            ? headerText.height / implicitHeight * implicitWidth
-                            : 0,
+            width: Math.min(implicitHeight > 0 ? headerText.height / implicitHeight * implicitWidth
+                                               : 0,
                             parent.width / 2.618) // Golden ratio - just for fun
 
             // Safe upper limit (see also topicField)
@@ -87,7 +86,7 @@ Page {
                     font: roomName.font
                     elide: Text.ElideRight
                     elideWidth: headerText.width
-                    text: room ? room.displayName : ""
+                    text: room?.displayName ?? ""
                 }
 
                 text: roomNameMetrics.elidedText
@@ -101,7 +100,7 @@ Page {
                               (roomNameMetrics.text != roomNameMetrics.elidedText
                                || roomName.lineCount > 1)
                 ToolTip.visible: hovered
-                ToolTip.text: room ? room.htmlSafeDisplayName : ""
+                ToolTip.text: room?.displayNameForHtml ?? ""
             }
 
             Label {
@@ -110,10 +109,9 @@ Page {
                 width: parent.width
                 leftPadding: headerText.innerLeftPadding
 
-                text: !room ? "" :
-                    room.successorId !== ""
-                              ? qsTr("This room has been upgraded.") :
-                    room.isUnstable ? qsTr("Unstable room version!") : ""
+                text: room?.successorId !== "" ? qsTr("This room has been upgraded.")
+                                               : room?.isUnstable ? qsTr("Unstable room version!")
+                                                                  : ""
                 elide: Text.ElideRight
                 font.italic: true
                 renderType: settings.render_type
@@ -130,15 +128,10 @@ Page {
                 id: topicField
                 visible: roomHeader.showTopic
                 width: parent.width
-                // Allow 6 lines of the topic but not more than 20% of the
-                // timeline vertical space; if there are more than 6 lines
-                // reveal the top of the 7th line as a hint
-                height: Math.min(
-                            topicText.contentHeight,
-                            root.height / 5,
-                            settings.lineSpacing * 6.6)
-                        + topicText.topPadding + topicText.bottomPadding
-                clip: true
+                // Allow 5 full (actually, 6 minus padding) lines of the topic
+                // but not more than 20% of the timeline vertical space
+                height:
+                    Math.min(topicText.implicitHeight, root.height / 5, settings.lineSpacing * 6)
 
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                 ScrollBar.vertical.policy: ScrollBar.AsNeeded
@@ -175,8 +168,7 @@ Page {
         MouseArea {
             anchors.fill: headerText
             acceptedButtons: Qt.MiddleButton | Qt.RightButton
-            cursorShape: topicText.hoveredLink
-                         ? Qt.PointingHandCursor : Qt.IBeamCursor
+            cursorShape: topicText.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
 
             onClicked: (mouse) => {
                 if (topicText.hoveredLink)
@@ -188,8 +180,7 @@ Page {
             Menu {
                 id: headerContextMenu
                 MenuItem {
-                    text: roomHeader.showTopic ? qsTr("Hide topic")
-                                               : qsTr("Show topic")
+                    text: roomHeader.showTopic ? qsTr("Hide topic") : qsTr("Show topic")
                     onTriggered: roomHeader.showTopic = !roomHeader.showTopic
                 }
             }
@@ -201,8 +192,7 @@ Page {
             anchors.verticalCenter: headerText.verticalCenter
             anchors.right: parent.right
             width: visible * implicitWidth
-            text: !room ? "" : room.successorId !== ""
-                                ? qsTr("Go to\nnew room") : qsTr("Room\nsettings")
+            text: room?.successorId !== "" ? qsTr("Go to\nnew room") : qsTr("Room\nsettings")
 
             onClicked:
                 if (room.successorId !== "")
@@ -232,8 +222,7 @@ Page {
 
         clip: true
         ScrollBar.vertical: ScrollBar {
-            policy: settings.use_shuttle_dial ? ScrollBar.AlwaysOff
-                                              : ScrollBar.AsNeeded
+            policy: settings.use_shuttle_dial ? ScrollBar.AlwaysOff : ScrollBar.AsNeeded
             interactive: true
             active: true
 //            background: Item { /* TODO: timeline map */ }
@@ -276,15 +265,14 @@ Page {
                 return
 
             // Take the current speed, or assume we can scroll 8 screens/s
-            var velocity = moving ? -verticalVelocity :
-                           cruisingAnimation.running ?
-                                        cruisingAnimation.velocity :
-                           chatView.height * 8
+            var velocity = moving ? -verticalVelocity
+                                  : cruisingAnimation.running ? cruisingAnimation.velocity
+                                                              : chatView.height * 8
             // Check if we're about to bump into the ceiling in
             // 2 seconds and if yes, request the amount of messages
             // enough to scroll at this rate for 3 more seconds
             if (velocity > 0 && contentY - velocity*2 < originY)
-                room.getHistory(velocity * eventDensity * 3)
+                room.getPreviousContent(velocity * eventDensity * 3)
         }
         onContentYChanged: ensurePreviousContent()
         onContentHeightChanged: ensurePreviousContent()
@@ -328,6 +316,9 @@ Page {
             }
             function onViewPositionRequested(index) {
                 scrollFinisher.scrollViewTo(index, ListView.Contain)
+            }
+            function onHistoryRequestChanged() {
+                scrollToReadMarkerButton.checked = controller.isHistoryRequestRunning()
             }
         }
 
@@ -457,8 +448,7 @@ Page {
                 font.bold: true
                 opacity: 0.8
                 renderType: settings.render_type
-                text: chatView.underlayingItem ?
-                          chatView.underlayingItem.ListView.section : ""
+                text: chatView.underlayingItem?.ListView.section ?? ""
             }
         }
     }
@@ -470,29 +460,21 @@ Page {
         id: cachedEventsBar
 
         // A proxy property for animation
-        property int requestedHistoryEventsCount:
-            room ? room.requestedEventsCount : 0
-        AnimationBehavior on requestedHistoryEventsCount {
-            NormalNumberAnimation { }
-        }
+        property int requestedHistoryEventsCount: room?.requestedHistorySize ?? 0
+        AnimationBehavior on requestedHistoryEventsCount { NormalNumberAnimation { } }
 
         property real averageEvtHeight:
             chatView.count + requestedHistoryEventsCount > 0
-            ? chatView.height
-              / (chatView.count + requestedHistoryEventsCount)
-            : 0
-        AnimationBehavior on averageEvtHeight {
-            FastNumberAnimation { }
-        }
+            ? chatView.height / (chatView.count + requestedHistoryEventsCount) : 0
+        AnimationBehavior on averageEvtHeight { FastNumberAnimation { } }
 
         anchors.horizontalCenter: shuttleDial.horizontalCenter
         anchors.bottom: chatView.bottom
         anchors.bottomMargin:
             averageEvtHeight * chatView.bottommostVisibleIndex
         width: shuttleDial.backgroundWidth / 2
-        height: chatView.bottommostVisibleIndex < 0 ? 0 :
-            averageEvtHeight
-            * (chatView.count - chatView.bottommostVisibleIndex)
+        height: chatView.bottommostVisibleIndex < 0
+                ? 0 : averageEvtHeight * (chatView.count - chatView.bottommostVisibleIndex)
         visible: shuttleDial.visible
 
         color: palette.mid
@@ -594,9 +576,8 @@ Page {
         anchors.top: chatView.top
         anchors.bottom: chatView.bottom
         anchors.right: parent.right
-        width: settings.use_shuttle_dial
-               ? shuttleDial.backgroundWidth
-               : chatView.ScrollBar.vertical.width
+        width: settings.use_shuttle_dial ? shuttleDial.backgroundWidth
+                                         : chatView.ScrollBar.vertical.width
         acceptedButtons: Qt.NoButton
 
         hoverEnabled: true
@@ -609,10 +590,9 @@ Page {
         width: childrenRect.width + 3
         height: childrenRect.height + 3
         color: palette.alternateBase
-        property bool shown:
-            (chatView.bottommostVisibleIndex >= 0
-                && (scrollerArea.containsMouse || scrollAnimation.running))
-            || (room && room.requestedEventsCount > 0)
+        property bool shown: (chatView.bottommostVisibleIndex >= 0
+                              && (scrollerArea.containsMouse || scrollAnimation.running))
+                             || room?.requestedHistorySize > 0
 
         onShownChanged: {
             if (shown) {
@@ -636,14 +616,12 @@ Page {
             text: (chatView.count > 0
                    ? (chatView.bottommostVisibleIndex === 0
                      ? qsTr("Latest events")
-                     : qsTr("%Ln events back from now","",
-                            chatView.bottommostVisibleIndex))
-                       + "\n" + qsTr("%Ln events cached", "", chatView.count)
+                     : qsTr("%Ln events back from now","", chatView.bottommostVisibleIndex))
+                     + "\n" + qsTr("%Ln events cached", "", chatView.count)
                    : "")
-                  + (room && room.requestedEventsCount > 0
+                  + (room?.requestedHistorySize > 0
                      ? (chatView.count > 0 ? "\n" : "")
-                       + qsTr("%Ln events requested from the server",
-                              "", room.requestedEventsCount)
+                       + qsTr("%Ln events requested from the server", "", room.requestedHistorySize)
                      : "")
             horizontalAlignment: Label.AlignRight
         }
@@ -711,8 +689,11 @@ Page {
             if (messageModel.readMarkerVisualIndex < chatView.count)
                 scrollFinisher.scrollViewTo(messageModel.readMarkerVisualIndex,
                                             ListView.Center)
-            else
-                room.getHistory(chatView.count / 2) // FIXME, #799
+            else {
+                checkable = true
+                controller.ensureLastReadEvent()
+            }
         }
+        onCheckedChanged: { if (!checked) checkable = false }
     }
 }
